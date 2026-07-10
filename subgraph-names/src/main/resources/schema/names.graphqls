@@ -1,5 +1,8 @@
 extend schema @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key"])
 
+"Marks a field as governed: the policy service decides who may read it, the router enforces. Registered at startup by imdb-common's GovernedFieldsRegistrar."
+directive @governed(reason: String) on FIELD_DEFINITION
+
 type Query {
     "Lookup by unique index on nconst."
     name(nconst: ID!): Name
@@ -10,8 +13,8 @@ type Query {
 type Name @key(fields: "nconst") {
     nconst: ID!
     primaryName: String
-    birthYear: Int
-    deathYear: Int
+    birthYear: Int @governed(reason: "person PII: birth year")
+    deathYear: Int @governed(reason: "person PII: death year")
     primaryProfessions: [String!]
     "Key stubs from csv knownForTitles; the router resolves Title fields elsewhere."
     knownForTitles: [Title!]

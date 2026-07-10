@@ -42,6 +42,14 @@ Java 21, Spring Boot 3.5.x, DGS 10.2.x (spring-graphql integration — only
   int32 0/1 flags map via `Fields.toBoolean`.
 - Every module's federation IT must assert the Mongo command count (via
   `MongoCommandCounter`) to prove batching — keep that pattern for new fields.
+- Field-level governance: `@governed(reason)` on FIELD_DEFINITION marks a
+  field as policy-controlled; `common`'s `GovernedFieldsRegistrar` registers
+  declarations with imdb-policy-service at startup (only when
+  POLICY_SERVICE_URL is set — deploy.yml sets it; local runs/tests don't).
+  Registration authenticates with a Google ID token minted as the runtime SA
+  and NEVER fails boot. Enforcement happens at the cosmo-router, not in
+  subgraphs. A newly governed field needs the directive definition + the
+  annotation in that schema file — nothing else.
 
 ## Gotchas
 

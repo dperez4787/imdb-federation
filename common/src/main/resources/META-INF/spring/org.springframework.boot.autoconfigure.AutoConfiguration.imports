@@ -1,1 +1,2 @@
 org.perez_f_daniel.imdb.common.mongo.ImdbCommonAutoConfiguration
+org.perez_f_daniel.imdb.common.governance.GovernanceAutoConfiguration
