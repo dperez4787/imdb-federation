@@ -1,0 +1,140 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency: deploy-main
+
+env:
+  PROJECT_ID: project-d60a83c1-2c60-4d51-ad0
+  REGION: us-central1
+  AR_REPO: imdb-federation
+  RUNTIME_SA: imdbfed-run@project-d60a83c1-2c60-4d51-ad0.iam.gserviceaccount.com
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      modules: ${{ steps.decide.outputs.modules }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            shared:
+              - 'common/**'
+              - 'pom.xml'
+              - 'Dockerfile'
+              - '.github/workflows/deploy.yml'
+            titles: ['subgraph-titles/**']
+            names: ['subgraph-names/**']
+            ratings: ['subgraph-ratings/**']
+            episodes: ['subgraph-episodes/**']
+            crew: ['subgraph-crew/**']
+            akas: ['subgraph-akas/**']
+            principals: ['subgraph-principals/**']
+
+      - name: Decide modules to deploy
+        id: decide
+        env:
+          SHARED: ${{ steps.filter.outputs.shared }}
+          CHANGES: ${{ steps.filter.outputs.changes }}
+        run: |
+          ALL='["titles","names","ratings","episodes","crew","akas","principals"]'
+          if [ "$SHARED" = "true" ]; then
+            MODULES="$ALL"
+          else
+            MODULES=$(echo "$CHANGES" | jq -c '[.[] | select(. != "shared")]')
+          fi
+          echo "modules=$MODULES" >> "$GITHUB_OUTPUT"
+          echo "Deploying: $MODULES"
+
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build and test all modules
+        run: ./mvnw -B verify
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate supergraph composition
+        run: npx -y wgc@0.129.0 router compose -i router/graph.local.yaml -o /tmp/execution-config.json
+
+  deploy:
+    needs: [changes, build-test]
+    if: needs.changes.outputs.modules != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJson(needs.changes.outputs.modules) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            MODULE=subgraph-${{ matrix.module }}
+          tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/${{ matrix.module }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.module }}
+          cache-to: type=gha,scope=${{ matrix.module }},mode=max
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy imdb-subgraph-${{ matrix.module }} \
+            --image "${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/${{ matrix.module }}:${{ github.sha }}" \
+            --region "${{ env.REGION }}" \
+            --project "${{ env.PROJECT_ID }}" \
+            --service-account "${{ env.RUNTIME_SA }}" \
+            --set-secrets "MONGODB_URI=IMDB_MONGODB_URI:latest" \
+            --allow-unauthenticated \
+            --port 8080 \
+            --min-instances 0 \
+            --max-instances 5 \
+            --memory 1Gi \
+            --cpu 1 \
+            --cpu-boost \
+            --quiet
+
+      - name: Smoke test
+        run: |
+          URL=$(gcloud run services describe imdb-subgraph-${{ matrix.module }} \
+            --region "${{ env.REGION }}" --project "${{ env.PROJECT_ID }}" \
+            --format 'value(status.url)')
+          echo "Service URL: $URL"
+          SDL=$(curl -sf -X POST "$URL/graphql" \
+            -H 'Content-Type: application/json' \
+            -d '{"query":"{ _service { sdl } }"}')
+          echo "$SDL" | grep -q '@key' || { echo "SDL missing @key"; exit 1; }
+          echo "Federated SDL OK"

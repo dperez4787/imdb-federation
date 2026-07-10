@@ -1,0 +1,34 @@
+# wgc compose input: the checked-in schema files are the composition source of
+# truth (DGS serves them verbatim as _service.sdl; federation ITs guard that).
+# routing_url values are the docker-compose service names; the Cloud Run router
+# phase will substitute the deployed service URLs.
+version: 1
+subgraphs:
+  - name: titles
+    routing_url: http://titles:8080/graphql
+    schema:
+      file: ../subgraph-titles/src/main/resources/schema/titles.graphqls
+  - name: names
+    routing_url: http://names:8080/graphql
+    schema:
+      file: ../subgraph-names/src/main/resources/schema/names.graphqls
+  - name: ratings
+    routing_url: http://ratings:8080/graphql
+    schema:
+      file: ../subgraph-ratings/src/main/resources/schema/ratings.graphqls
+  - name: episodes
+    routing_url: http://episodes:8080/graphql
+    schema:
+      file: ../subgraph-episodes/src/main/resources/schema/episodes.graphqls
+  - name: crew
+    routing_url: http://crew:8080/graphql
+    schema:
+      file: ../subgraph-crew/src/main/resources/schema/crew.graphqls
+  - name: akas
+    routing_url: http://akas:8080/graphql
+    schema:
+      file: ../subgraph-akas/src/main/resources/schema/akas.graphqls
+  - name: principals
+    routing_url: http://principals:8080/graphql
+    schema:
+      file: ../subgraph-principals/src/main/resources/schema/principals.graphqls

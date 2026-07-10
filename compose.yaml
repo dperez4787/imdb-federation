@@ -1,0 +1,53 @@
+# Local dev stack: all 7 subgraphs + the Cosmo router.
+#
+#   1. ./mvnw -B -DskipTests package
+#   2. npx -y wgc@0.129.0 router compose -i router/graph.local.yaml -o router/execution-config.json
+#   3. MONGODB_URI=... docker compose up --build
+#   4. GraphiQL on the router: http://localhost:3002
+#
+# MONGODB_URI must point at a database with the imdb collections (Atlas or a
+# locally seeded mongo). Subgraphs are also exposed directly on 8081-8087.
+
+x-subgraph: &subgraph
+  environment:
+    MONGODB_URI: ${MONGODB_URI:?set MONGODB_URI in .env or the environment}
+
+services:
+  titles:
+    <<: *subgraph
+    build: { context: ., args: { MODULE: subgraph-titles } }
+    ports: ["8081:8080"]
+  names:
+    <<: *subgraph
+    build: { context: ., args: { MODULE: subgraph-names } }
+    ports: ["8082:8080"]
+  ratings:
+    <<: *subgraph
+    build: { context: ., args: { MODULE: subgraph-ratings } }
+    ports: ["8083:8080"]
+  episodes:
+    <<: *subgraph
+    build: { context: ., args: { MODULE: subgraph-episodes } }
+    ports: ["8084:8080"]
+  crew:
+    <<: *subgraph
+    build: { context: ., args: { MODULE: subgraph-crew } }
+    ports: ["8085:8080"]
+  akas:
+    <<: *subgraph
+    build: { context: ., args: { MODULE: subgraph-akas } }
+    ports: ["8086:8080"]
+  principals:
+    <<: *subgraph
+    build: { context: ., args: { MODULE: subgraph-principals } }
+    ports: ["8087:8080"]
+
+  router:
+    image: ghcr.io/wundergraph/cosmo/router:latest
+    ports: ["3002:3002"]
+    environment:
+      CONFIG_PATH: /config/config.yaml
+    volumes:
+      - ./router/config.yaml:/config/config.yaml:ro
+      - ./router/execution-config.json:/config/execution-config.json:ro
+    depends_on: [titles, names, ratings, episodes, crew, akas, principals]

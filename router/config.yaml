@@ -1,0 +1,8 @@
+# Cosmo router in standalone (no control plane) mode: executes the statically
+# composed config produced by `wgc router compose`.
+dev_mode: true
+listen_addr: 0.0.0.0:3002
+execution_config:
+  file:
+    path: /config/execution-config.json
+    watch: true
