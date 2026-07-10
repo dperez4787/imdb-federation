@@ -13,6 +13,7 @@ COPY subgraph-episodes/ subgraph-episodes/
 COPY subgraph-crew/ subgraph-crew/
 COPY subgraph-akas/ subgraph-akas/
 COPY subgraph-principals/ subgraph-principals/
+COPY subgraph-orchestrator/ subgraph-orchestrator/
 RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -q -pl ${MODULE} -am -DskipTests package
 

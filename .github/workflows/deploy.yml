@@ -36,6 +36,7 @@ jobs:
             crew: ['subgraph-crew/**']
             akas: ['subgraph-akas/**']
             principals: ['subgraph-principals/**']
+            orchestrator: ['subgraph-orchestrator/**']
 
       - name: Decide modules to deploy
         id: decide
@@ -43,7 +44,7 @@ jobs:
           SHARED: ${{ steps.filter.outputs.shared }}
           CHANGES: ${{ steps.filter.outputs.changes }}
         run: |
-          ALL='["titles","names","ratings","episodes","crew","akas","principals"]'
+          ALL='["titles","names","ratings","episodes","crew","akas","principals","orchestrator"]'
           if [ "$SHARED" = "true" ]; then
             MODULES="$ALL"
           else
@@ -120,6 +121,7 @@ jobs:
             --set-secrets "MONGODB_URI=IMDB_MONGODB_URI:latest" \
             --no-allow-unauthenticated \
             --port 8080 \
+            --timeout 3600 \
             --min-instances 0 \
             --max-instances 5 \
             --memory 1Gi \

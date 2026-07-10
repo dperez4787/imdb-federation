@@ -32,3 +32,7 @@ subgraphs:
     routing_url: http://principals:8080/graphql
     schema:
       file: ../subgraph-principals/src/main/resources/schema/principals.graphqls
+  - name: orchestrator
+    routing_url: http://orchestrator:8080/graphql
+    schema:
+      file: ../subgraph-orchestrator/src/main/resources/schema/orchestrator.graphqls

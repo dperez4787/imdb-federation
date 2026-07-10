@@ -34,6 +34,7 @@
     <module>subgraph-crew</module>
     <module>subgraph-akas</module>
     <module>subgraph-principals</module>
+    <module>subgraph-orchestrator</module>
   </modules>
 
   <build>

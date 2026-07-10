@@ -1,0 +1,149 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key"])
+
+type Query {
+    """
+    Search titles over the derived search_titles collection. All filter dimensions
+    AND together; an empty filter browses everything (use sort + paging). Results
+    are key stubs — the router hydrates Title fields from the owning subgraphs.
+    Data is as fresh as the last rebuild (see searchInfo.rebuiltAt).
+    """
+    searchTitles(
+        filter: TitleSearchFilter! = {}
+        sort: TitleSort! = RELEVANCE
+        "1..100, default 25."
+        limit: Int
+        "0..10000, default 0."
+        offset: Int
+    ): TitleSearchResult!
+
+    """
+    Search people. Title-scoped dimensions (inTitles, inGenres, activeFrom/To,
+    categories) join through title_principals at query time; an open-ended title
+    scope (inGenres/activeFrom without inTitles) is capped to the most-popular N
+    matching titles (titleCandidatesCapped reports truncation).
+    """
+    searchNames(
+        filter: NameSearchFilter! = {}
+        sort: NameSort! = RELEVANCE
+        limit: Int
+        offset: Int
+    ): NameSearchResult!
+
+    "Freshness/size of the derived search collections (last successful rebuild)."
+    searchInfo: SearchInfo!
+}
+
+"""
+All fields optional; absent = unconstrained. Genre/titleType/category values are
+data-driven strings (genres 'Sci-Fi'; titleTypes 'movie', 'tvSeries'; categories
+'actor', 'actress', 'director'). Unknown values match nothing.
+"""
+input TitleSearchFilter {
+    "Full-text search on primaryTitle (word/stem match, not substring)."
+    query: String
+    "Case-insensitive anchored prefix on primaryTitle (autocomplete). Min 2 chars. Mutually exclusive with query."
+    titlePrefix: String
+    titleTypes: [String!]
+    "Title has at least one of these genres. Max 10."
+    genresAny: [String!]
+    "Title has all of these genres. Max 5. Combinable with genresAny."
+    genresAll: [String!]
+    startYearFrom: Int
+    startYearTo: Int
+    runtimeFrom: Int
+    runtimeTo: Int
+    "Excludes unrated titles (no ratings row) by definition."
+    ratingFrom: Float
+    ratingTo: Float
+    "Excludes unrated titles by definition."
+    votesFrom: Int
+    includeAdult: Boolean! = false
+    "nconsts that must be credited on the title (title_principals join). Max 20."
+    withPeople: [ID!]
+    "ALL: every listed person is credited; ANY: at least one. Ignored without withPeople."
+    peopleMode: PeopleMatchMode! = ALL
+    "Restrict the withPeople credit match to these categories."
+    peopleCategories: [String!]
+    # EXTENSION POINT — awards are descoped (no source data in the IMDb TSVs).
+    # When an awards dataset lands: add `awards: AwardFilter` here plus a
+    # search_awards derived collection; no other filter changes needed.
+}
+
+input NameSearchFilter {
+    """
+    Text search on primaryName. Uses the text index when no title-scoped dimension
+    is present; combined with inTitles/inGenres/activeFrom/To it degrades to a
+    case-insensitive substring match over the joined candidate set.
+    """
+    query: String
+    "Case-insensitive anchored prefix on primaryName (autocomplete). Min 2 chars. Exclusive with query."
+    namePrefix: String
+    "primaryProfession contains at least one of these (e.g. 'actor', 'composer')."
+    professions: [String!]
+    bornFrom: Int
+    bornTo: Int
+    "Person is credited on at least one of these tconsts. Max 100."
+    inTitles: [ID!]
+    "Person is credited on a title with at least one of these genres. Max 10."
+    inGenres: [String!]
+    "Person is credited on a title whose startYear falls in [activeFrom, activeTo]."
+    activeFrom: Int
+    activeTo: Int
+    "Credit category filter for the title-scoped dimensions. Requires inTitles/inGenres/activeFrom/activeTo."
+    categories: [String!]
+}
+
+enum TitleSort {
+    "Text score when filter.query is set; otherwise POPULARITY_DESC."
+    RELEVANCE
+    "Vote count descending — the default popularity ranking."
+    POPULARITY_DESC
+    "averageRating desc; unrated titles excluded only if ratingFrom/votesFrom set. Combine with votesFrom to avoid 10-vote 9.9s."
+    RATING_DESC
+    YEAR_DESC
+    YEAR_ASC
+}
+
+enum NameSort {
+    "Text score when filter.query is set; CREDITS_DESC when title-scoped; else POPULARITY_DESC."
+    RELEVANCE
+    "Materialized popularity: sum of numVotes over the person's knownForTitles."
+    POPULARITY_DESC
+    "Matching credits within the searched title scope. Requires a title-scoped filter."
+    CREDITS_DESC
+    NAME_ASC
+    BIRTH_YEAR_ASC
+    BIRTH_YEAR_DESC
+}
+
+enum PeopleMatchMode { ANY ALL }
+
+type TitleSearchResult {
+    "Exact when totalIsCapped is false; otherwise 'at least 10000'. Computed only if selected."
+    total: Int!
+    totalIsCapped: Boolean!
+    items: [Title!]!
+}
+
+type NameSearchResult {
+    total: Int!
+    totalIsCapped: Boolean!
+    "True when the open-ended title scope was truncated to the most popular N matching titles. Computed only if selected."
+    titleCandidatesCapped: Boolean!
+    items: [Name!]!
+}
+
+type SearchInfo {
+    "ISO-8601 instant of the last successful rebuild; null if never built."
+    rebuiltAt: String
+    titleCount: Int
+    nameCount: Int
+}
+
+type Title @key(fields: "tconst", resolvable: false) {
+    tconst: ID!
+}
+
+type Name @key(fields: "nconst", resolvable: false) {
+    nconst: ID!
+}

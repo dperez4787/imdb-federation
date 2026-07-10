@@ -6,7 +6,7 @@
 #   - cosmorouter-deploy: cosmo-router CI introspects live subgraph SDLs to compose
 #   - imdbfed-deploy:     this repo's post-deploy smoke tests
 locals {
-  subgraph_modules = ["titles", "names", "ratings", "episodes", "crew", "akas", "principals"]
+  subgraph_modules = ["titles", "names", "ratings", "episodes", "crew", "akas", "principals", "orchestrator"]
   subgraph_invokers = [
     "serviceAccount:cosmorouter-run@${local.project_id}.iam.gserviceaccount.com",
     "serviceAccount:cosmorouter-deploy@${local.project_id}.iam.gserviceaccount.com",

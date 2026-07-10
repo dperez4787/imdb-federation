@@ -27,6 +27,13 @@ Java 21, Spring Boot 3.5.x, DGS 10.2.x (spring-graphql integration — only
   Owner subgraphs load inside the entity fetcher (async, Pattern A); contributor
   subgraphs return sync key stubs and load at field level (Pattern B). Root
   single-parent queries use a plain indexed find.
+  EXCEPTION: subgraph-orchestrator runs single root aggregations (no per-entity
+  fan-out, so no DataLoaders) over its own derived collections `search_titles`/
+  `search_names`, rebuilt via `/admin/rebuild` (REST on purpose — IAM-only,
+  never exposed through the router). Its result stubs are `resolvable: false`;
+  it has NO entity fetchers. Its pipelines live in TitlePipelines/NamePipelines
+  (pure builders — every $sort must end with an _id tiebreak, every truncation
+  needs a deterministic pre-sort).
 - Root queries may only use existing indexes: tconst/nconst uniques,
   `parentTconst`, principals `nconst`, akas `(titleId, ordering)`.
 - Data quirks (from the import pipeline): `\N` fields are ABSENT in Mongo (never
@@ -45,6 +52,9 @@ Java 21, Spring Boot 3.5.x, DGS 10.2.x (spring-graphql integration — only
 - Mongo pool defaults (maxSize 15) live in `ImdbCommonAutoConfiguration`; URI
   options override them. Don't raise them: 7 services share one Atlas M10.
 - Deploys: push to main; `dorny/paths-filter` picks changed modules (shared
-  files -> all 7). Services are `imdb-subgraph-<name>` in us-central1,
+  files -> all 8). Services are `imdb-subgraph-<name>` in us-central1,
   min-instances=0. Terraform in `infra/` covers IAM/AR/WIF only, never the
-  Cloud Run services.
+  Cloud Run services. A new module touches: pom.xml, Dockerfile COPY line,
+  deploy.yml (filter + ALL), router/graph.local.yaml, infra/subgraph_invokers.tf
+  (service must exist before terraform apply), and cosmo-router's
+  scripts/compose.sh SUBGRAPHS array.

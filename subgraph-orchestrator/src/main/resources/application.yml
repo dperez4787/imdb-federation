@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: subgraph-orchestrator
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/imdb}
+
+dgs:
+  graphql:
+    schema-locations: classpath:schema/**
+    federation:
+      enabled: true
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

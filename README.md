@@ -1,12 +1,14 @@
 # imdb-federation
 
 GraphQL federation over the IMDb datasets: one Spring Boot + [Netflix DGS](https://netflix.github.io/dgs/)
-subgraph per MongoDB collection, composed by a [WunderGraph Cosmo](https://cosmo-docs.wundergraph.com/) router.
-Data is loaded into MongoDB Atlas by [imdb-data-pipeline](https://github.com/dperez4787/imdb-data-pipeline).
+subgraph per MongoDB collection plus a search orchestrator, composed by a
+[WunderGraph Cosmo](https://cosmo-docs.wundergraph.com/) router
+([cosmo-router](https://github.com/dperez4787/cosmo-router)). Data is loaded into
+MongoDB Atlas by [imdb-data-pipeline](https://github.com/dperez4787/imdb-data-pipeline).
 
 ## Architecture
 
-Two federated entities, seven subgraphs (Apollo Federation v2.5 spec):
+Two federated entities, eight subgraphs (Apollo Federation v2.5 spec):
 
 | Module | Collection | Contributes |
 |---|---|---|
@@ -17,6 +19,7 @@ Two federated entities, seven subgraphs (Apollo Federation v2.5 spec):
 | `subgraph-crew` | `title_crew` | `Title.directors`, `Title.writers` |
 | `subgraph-akas` | `title_akas` | `Title.akas` |
 | `subgraph-principals` | `title_principals` | `Title.principals`, `Name.credits`, `Query.principalsByName` |
+| `subgraph-orchestrator` | `search_titles`/`search_names` (derived) | `Query.searchTitles/searchNames/searchInfo` — multi-dimensional search returning entity stubs |
 
 Every lookup is a DataLoader-batched, indexed `$in` query (entity fetchers included:
 N `_entities` representations collapse into one Mongo command — the integration
@@ -66,5 +69,15 @@ is Terraform in `infra/`; the Cloud Run services themselves are created by
 `gcloud run deploy` in CI. Subgraphs read the Atlas URI from the
 `IMDB_MONGODB_URI` secret owned by the pipeline stack.
 
-The Cosmo router deployment (composing the deployed subgraph URLs) is a later
-phase; until then cross-subgraph fields resolve only through a local router.
+## Search (subgraph-orchestrator)
+
+`searchTitles`/`searchNames` run Mongo aggregations over **derived collections**
+(`search_titles`, `search_names`) that denormalize the source data into
+search-friendly shapes (genres as arrays, ratings merged in, a materialized
+per-person `popularity` = sum of numVotes over knownForTitles). Results are
+entity key stubs the router hydrates from the owning subgraphs. See
+[API-CHANGES.md](API-CHANGES.md) for the full search API contract.
+
+The derived collections are rebuilt via `./scripts/rebuild.sh` (chunked calls to
+the IAM-protected `POST /admin/rebuild?steps=...`) — run it after each pipeline
+import; `searchInfo.rebuiltAt` reports freshness.
