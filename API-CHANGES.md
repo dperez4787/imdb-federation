@@ -84,6 +84,22 @@ title-scoped; otherwise popularity), `POPULARITY_DESC` (materialized: sum of num
 the person's knownForTitles — the default people ranking), `CREDITS_DESC` (requires title
 scope), `NAME_ASC`, `BIRTH_YEAR_ASC/DESC`.
 
+### `search(query: String!, kinds: [SearchKind!], limit: Int): [SearchHit!]!`
+
+The global search box: one call, titles and people merged and ranked (text relevance,
+popularity breaking ties). `union SearchHit = Title | Name` — branch on `__typename`.
+`kinds: [TITLE]`/`[NAME]` restricts; default both. `limit` 1–50 (default 10), no paging,
+no counts, adult titles excluded. Query min 2 chars; word/stem matching — use
+`titlePrefix`/`namePrefix` autocomplete while the user is still typing.
+
+```graphql
+{ search(query: "carmencita", limit: 10) {
+    __typename
+    ... on Title { tconst primaryTitle startYear rating { averageRating } }
+    ... on Name { nconst primaryName }
+} }
+```
+
 ### `searchInfo: SearchInfo!`
 
 `{ rebuiltAt, titleCount, nameCount }` — freshness of the derived search data. Surface

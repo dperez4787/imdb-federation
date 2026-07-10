@@ -29,9 +29,21 @@ type Query {
         offset: Int
     ): NameSearchResult!
 
+    """
+    Unified search across titles and people — the global search box. Word/stem
+    matching on the submitted query (use titlePrefix/namePrefix autocomplete
+    while typing). Ranked by text relevance, popularity breaking ties. Max 50
+    results, no paging; adult titles excluded.
+    """
+    search(query: String!, kinds: [SearchKind!], limit: Int): [SearchHit!]!
+
     "Freshness/size of the derived search collections (last successful rebuild)."
     searchInfo: SearchInfo!
 }
+
+enum SearchKind { TITLE NAME }
+
+union SearchHit = Title | Name
 
 """
 All fields optional; absent = unconstrained. Genre/titleType/category values are

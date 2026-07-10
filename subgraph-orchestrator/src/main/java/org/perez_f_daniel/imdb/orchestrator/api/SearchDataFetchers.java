@@ -24,16 +24,19 @@ public class SearchDataFetchers {
 
   private final TitleSearchService titles;
   private final NameSearchService names;
+  private final org.perez_f_daniel.imdb.orchestrator.search.UnifiedSearchService unified;
   private final FilterValidation validation;
   private final SearchProperties props;
   private final MongoTemplate mongo;
   private final Executor executor;
 
   public SearchDataFetchers(TitleSearchService titles, NameSearchService names,
+      org.perez_f_daniel.imdb.orchestrator.search.UnifiedSearchService unified,
       FilterValidation validation, SearchProperties props, MongoTemplate mongo,
       @Qualifier("imdbLoaderExecutor") Executor executor) {
     this.titles = titles;
     this.names = names;
+    this.unified = unified;
     this.validation = validation;
     this.props = props;
     this.mongo = mongo;
@@ -97,6 +100,21 @@ public class SearchDataFetchers {
     NameSort s = sort == null ? NameSort.RELEVANCE : sort;
     validation.validate(f, s, limit, offset);
     return new NameSearchContext(f, s, PageArgs.clamp(limit, offset, props.defaultLimit(), props.maxLimit()));
+  }
+
+  @DgsQuery
+  public CompletableFuture<List<Object>> search(
+      @InputArgument String query, @InputArgument List<SearchKind> kinds,
+      @InputArgument Integer limit) {
+    if (query == null || query.strip().length() < 2) {
+      throw new com.netflix.graphql.dgs.exceptions.DgsBadRequestException(
+          "query must be at least 2 characters");
+    }
+    java.util.Set<SearchKind> kindSet = kinds == null || kinds.isEmpty()
+        ? java.util.EnumSet.allOf(SearchKind.class)
+        : java.util.EnumSet.copyOf(kinds);
+    int n = limit == null ? 10 : Math.min(Math.max(limit, 1), 50);
+    return CompletableFuture.supplyAsync(() -> unified.search(query.strip(), kindSet, n), executor);
   }
 
   @DgsQuery
