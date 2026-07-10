@@ -1,0 +1,20 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key"])
+
+type Query {
+    "Lookup by unique index on tconst."
+    title(tconst: ID!): Title
+    "Batch lookup; result preserves input order, null for unknown ids. Max 100 ids."
+    titles(tconsts: [ID!]!): [Title]!
+}
+
+type Title @key(fields: "tconst") {
+    tconst: ID!
+    titleType: String
+    primaryTitle: String
+    originalTitle: String
+    isAdult: Boolean
+    startYear: Int
+    endYear: Int
+    runtimeMinutes: Int
+    genres: [String!]
+}
