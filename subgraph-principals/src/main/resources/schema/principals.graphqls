@@ -1,0 +1,28 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key"])
+
+type Query {
+    "Credits for a person, by the nconst index. Sorted by (tconst, ordering)."
+    principalsByName(nconst: ID!, limit: Int! = 50, offset: Int! = 0): [Principal!]!
+}
+
+type Title @key(fields: "tconst") {
+    tconst: ID!
+    "Billed cast and crew, sorted by ordering. Bounded (~10s per title)."
+    principals: [Principal!]!
+}
+
+type Name @key(fields: "nconst") {
+    nconst: ID!
+    "Can be 100s-1000s for prolific people. Sorted by (tconst, ordering)."
+    credits(limit: Int! = 50, offset: Int! = 0): [Principal!]!
+}
+
+type Principal {
+    ordering: Int!
+    category: String
+    job: String
+    "Parsed from IMDb's JSON-array-like string, e.g. [\"Self\"]. Null when absent or unparseable."
+    characters: [String!]
+    name: Name!
+    title: Title!
+}

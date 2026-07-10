@@ -1,0 +1,12 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key"])
+
+type Title @key(fields: "tconst") {
+    tconst: ID!
+    "Null when the title has no ratings row."
+    rating: Rating
+}
+
+type Rating {
+    averageRating: Float!
+    numVotes: Int!
+}

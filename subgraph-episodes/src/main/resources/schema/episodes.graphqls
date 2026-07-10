@@ -1,0 +1,20 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key"])
+
+type Query {
+    "Episodes of a series, by the parentTconst index. Sorted by (seasonNumber, episodeNumber)."
+    episodesOfSeries(parentTconst: ID!, limit: Int! = 50, offset: Int! = 0): [Title!]!
+}
+
+type Title @key(fields: "tconst") {
+    tconst: ID!
+    "Non-null only when this title is an episode (has a row in title_episode)."
+    episode: Episode
+    "Episodes of this series; empty for non-series. Soaps exceed 10k episodes - paginate."
+    episodes(limit: Int! = 50, offset: Int! = 0): [Title!]!
+}
+
+type Episode {
+    seasonNumber: Int
+    episodeNumber: Int
+    series: Title!
+}

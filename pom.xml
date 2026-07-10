@@ -28,14 +28,12 @@
   <modules>
     <module>common</module>
     <module>subgraph-titles</module>
-    <!-- enabled as each subgraph is implemented:
     <module>subgraph-names</module>
     <module>subgraph-ratings</module>
     <module>subgraph-episodes</module>
     <module>subgraph-crew</module>
     <module>subgraph-akas</module>
     <module>subgraph-principals</module>
-    -->
   </modules>
 
   <build>

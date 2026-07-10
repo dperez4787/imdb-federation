@@ -1,0 +1,22 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key"])
+
+type Query {
+    "Lookup by unique index on nconst."
+    name(nconst: ID!): Name
+    "Batch lookup; result preserves input order, null for unknown ids. Max 100 ids."
+    names(nconsts: [ID!]!): [Name]!
+}
+
+type Name @key(fields: "nconst") {
+    nconst: ID!
+    primaryName: String
+    birthYear: Int
+    deathYear: Int
+    primaryProfessions: [String!]
+    "Key stubs from csv knownForTitles; the router resolves Title fields elsewhere."
+    knownForTitles: [Title!]
+}
+
+type Title @key(fields: "tconst", resolvable: false) {
+    tconst: ID!
+}

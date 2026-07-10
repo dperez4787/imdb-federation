@@ -1,0 +1,12 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key"])
+
+type Title @key(fields: "tconst") {
+    tconst: ID!
+    "Null when no crew row or the directors column is absent. Name key stubs only."
+    directors: [Name!]
+    writers: [Name!]
+}
+
+type Name @key(fields: "nconst", resolvable: false) {
+    nconst: ID!
+}
