@@ -138,3 +138,17 @@ jobs:
             -d '{"query":"{ _service { sdl } }"}')
           echo "$SDL" | grep -q '@key' || { echo "SDL missing @key"; exit 1; }
           echo "Federated SDL OK"
+
+  # The router bakes the composed schema into its image, so it must recompose
+  # and redeploy after every subgraph rollout. Fires only when all matrix legs
+  # above succeeded — the router composes from the LIVE subgraph SDLs.
+  notify-router:
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger cosmo-router recompose and redeploy
+        run: |
+          gh api repos/dperez4787/cosmo-router/dispatches \
+            -f event_type=subgraphs-updated
+        env:
+          GH_TOKEN: ${{ secrets.ROUTER_DISPATCH_TOKEN }}
