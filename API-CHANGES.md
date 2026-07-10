@@ -100,6 +100,41 @@ no counts, adult titles excluded. Query min 2 chars; word/stem matching — use
 } }
 ```
 
+### `facets: Facets!` — vocabulary facets (dropdown/checkbox sources)
+
+Materialized at rebuild with global counts, sorted by count desc (≤200 values each):
+`genres`, `titleTypes`, `principalCategories` (crew/credit job types from title_principals),
+`professions`, `akaRegions`, `akaLanguages` — each `[FacetValue!]!` of `{value, count}`.
+One cheap read; safe to fetch on app load and cache.
+
+```graphql
+{ facets { genres { value count } principalCategories { value count } } }
+```
+
+### Contextual facets — `facets(dimensions, perDimension)` on both result types
+
+Live value counts **within the current filter** (checkbox counts that update as the user
+narrows). Computed only when selected; evaluated over at most the same 10k candidate cap
+as `total`; `perDimension` 1–50 (default 20).
+
+- `TitleSearchResult.facets(dimensions: [TitleFacetDimension!]!)` — `GENRES`,
+  `TITLE_TYPES`, `DECADES` (value = decade start, e.g. "1990"), `RATING_BANDS`
+  (value = floor, "8" = 8.0–8.9), `RUNTIME_BANDS` (0/30/60/90/120/150/180+ minutes).
+- `NameSearchResult.facets(dimensions: [NameFacetDimension!]!)` — `PROFESSIONS`,
+  `BIRTH_DECADES`.
+
+```graphql
+{ searchTitles(filter: {genresAny: ["Drama"]}) {
+    items { tconst primaryTitle }
+    facets(dimensions: [GENRES, DECADES, RATING_BANDS]) { dimension values { value count } }
+} }
+```
+
+This is the deliberate alternative to exposing raw Mongo pipelines: typed dimensions map
+internally onto `$facet`/`$sortByCount`/`$bucket`. Award dropdowns will slot in as new
+facet ids + an `AWARDS` dimension once an awards dataset exists (still no awards data in
+the IMDb TSVs).
+
 ### `searchInfo: SearchInfo!`
 
 `{ rebuiltAt, titleCount, nameCount }` — freshness of the derived search data. Surface

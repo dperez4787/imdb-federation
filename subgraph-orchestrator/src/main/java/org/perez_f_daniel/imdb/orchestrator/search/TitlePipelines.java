@@ -34,7 +34,7 @@ public final class TitlePipelines {
 
   public static List<Document> items(
       TitleSearchFilter f, TitleSort sort, PageArgs page, List<String> allTitleTypes, SearchProperties props) {
-    List<Document> p = base(f, sort, allTitleTypes, props);
+    List<Document> p = baseStages(f, allTitleTypes, props);
     p.add(new Document("$sort", sortSpec(f, sort, strategyFor(f))));
     if (page.offset() > 0) {
       p.add(new Document("$skip", page.offset()));
@@ -46,15 +46,15 @@ public final class TitlePipelines {
 
   public static List<Document> count(
       TitleSearchFilter f, TitleSort sort, List<String> allTitleTypes, SearchProperties props) {
-    List<Document> p = base(f, sort, allTitleTypes, props);
+    List<Document> p = baseStages(f, allTitleTypes, props);
     p.add(new Document("$limit", props.countCap() + 1));
     p.add(new Document("$count", "n"));
     return p;
   }
 
-  /** Shared match/join stages, up to (excluding) the final sort/page. */
-  private static List<Document> base(
-      TitleSearchFilter f, TitleSort sort, List<String> allTitleTypes, SearchProperties props) {
+  /** Shared match/join stages, up to (excluding) the final sort/page. Also the facet base. */
+  public static List<Document> baseStages(
+      TitleSearchFilter f, List<String> allTitleTypes, SearchProperties props) {
     return switch (strategyFor(f)) {
       case PLAIN -> plainBase(f, allTitleTypes);
       case PEOPLE_FIRST -> peopleFirstBase(f, allTitleTypes);

@@ -9,7 +9,7 @@
 set -euo pipefail
 
 URL="${URL:-https://imdb-subgraph-orchestrator-dkuqnmldta-uc.a.run.app}"
-STEPS=(titles ratings names kft popularity indexes promote)
+STEPS=(titles ratings names kft popularity indexes promote facets)
 
 id_token() {
   if [ -n "${IMPERSONATE_SA:-}" ]; then

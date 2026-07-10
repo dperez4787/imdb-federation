@@ -37,7 +37,7 @@ public final class NamePipelines {
 
   public static List<Document> items(NameSearchFilter f, NameSort sort, PageArgs page,
       List<String> resolvedInTitles, SearchProperties props) {
-    List<Document> p = base(f, resolvedInTitles, props);
+    List<Document> p = baseStages(f, resolvedInTitles, props);
     p.add(new Document("$sort", sortSpec(f, sort, strategyFor(f))));
     if (page.offset() > 0) {
       p.add(new Document("$skip", page.offset()));
@@ -50,7 +50,7 @@ public final class NamePipelines {
 
   public static List<Document> count(NameSearchFilter f, List<String> resolvedInTitles,
       SearchProperties props) {
-    List<Document> p = base(f, resolvedInTitles, props);
+    List<Document> p = baseStages(f, resolvedInTitles, props);
     p.add(new Document("$limit", props.countCap() + 1));
     p.add(new Document("$count", "n"));
     return p;
@@ -65,7 +65,8 @@ public final class NamePipelines {
     return p;
   }
 
-  private static List<Document> base(NameSearchFilter f, List<String> resolvedInTitles,
+  /** Shared match/join stages, up to (excluding) the final sort/page. Also the facet base. */
+  public static List<Document> baseStages(NameSearchFilter f, List<String> resolvedInTitles,
       SearchProperties props) {
     return switch (strategyFor(f)) {
       case UNSCOPED -> unscopedBase(f);

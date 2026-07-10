@@ -55,9 +55,9 @@ public class NameSearchService {
   /**
    * inTitles combined with inGenres/activeFrom/To: pre-filter the explicit tconst
    * list through search_titles so the principals-first pipeline sees only titles
-   * matching the whole scope.
+   * matching the whole scope. Public: facet fetchers need the same resolution.
    */
-  private List<String> resolvedInTitles(NameSearchFilter f) {
+  public List<String> resolvedInTitles(NameSearchFilter f) {
     if (!f.hasInTitles()) {
       return List.of();
     }

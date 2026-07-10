@@ -32,8 +32,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class RebuildService {
 
-  /** Declared execution order; ?steps= subsets must respect it. */
-  public enum Step { TITLES, RATINGS, NAMES, KFT, POPULARITY, INDEXES, PROMOTE }
+  /** Declared execution order; ?steps= subsets must respect it. FACETS reads the LIVE (promoted) collections. */
+  public enum Step { TITLES, RATINGS, NAMES, KFT, POPULARITY, INDEXES, PROMOTE, FACETS }
 
   public static final class RebuildLockedException extends RuntimeException {
     RebuildLockedException() {
@@ -170,7 +170,46 @@ public class RebuildService {
             Updates.set("titleTypes", types)));
         titleTypes.invalidate();
       }
+
+      case FACETS -> {
+        materializeFacet("genres", "search_titles",
+            new Document("$unwind", "$genres"), "$genres");
+        materializeFacet("titleTypes", "search_titles", null, "$titleType");
+        materializeFacet("principalCategories", "title_principals",
+            new Document("$match", new Document("category", new Document("$exists", true))),
+            "$category");
+        materializeFacet("professions", "search_names",
+            new Document("$unwind", "$professions"), "$professions");
+        materializeFacet("akaRegions", "title_akas",
+            new Document("$match", new Document("region", new Document("$exists", true))),
+            "$region");
+        materializeFacet("akaLanguages", "title_akas",
+            new Document("$match", new Document("language", new Document("$exists", true))),
+            "$language");
+      }
     }
+  }
+
+  private static final int FACET_VALUE_CAP = 200;
+
+  /** One value-count pass per vocabulary, upserted into search_facets. */
+  private void materializeFacet(String id, String collection, Document preStage, String groupExpr) {
+    List<Document> pipeline = new ArrayList<>();
+    if (preStage != null) {
+      pipeline.add(preStage);
+    }
+    pipeline.add(new Document("$group",
+        new Document("_id", groupExpr).append("count", new Document("$sum", 1))));
+    pipeline.add(new Document("$sort", new Document("count", -1).append("_id", 1)));
+    pipeline.add(new Document("$limit", FACET_VALUE_CAP));
+    pipeline.add(new Document("$project", new Document("_id", 0)
+        .append("value", "$_id").append("count", 1)));
+    List<Document> values = mongo.getDb().getCollection(collection)
+        .aggregate(pipeline).allowDiskUse(true).into(new ArrayList<>());
+    mongo.getDb().getCollection("search_facets").replaceOne(
+        Filters.eq("_id", id),
+        new Document("_id", id).append("values", values),
+        new com.mongodb.client.model.ReplaceOptions().upsert(true));
   }
 
   /** {$split: [csv, ","]} when present, $$REMOVE when the source column was absent. */

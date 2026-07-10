@@ -25,6 +25,7 @@ public class SearchDataFetchers {
   private final TitleSearchService titles;
   private final NameSearchService names;
   private final org.perez_f_daniel.imdb.orchestrator.search.UnifiedSearchService unified;
+  private final org.perez_f_daniel.imdb.orchestrator.search.FacetService facetService;
   private final FilterValidation validation;
   private final SearchProperties props;
   private final MongoTemplate mongo;
@@ -32,11 +33,13 @@ public class SearchDataFetchers {
 
   public SearchDataFetchers(TitleSearchService titles, NameSearchService names,
       org.perez_f_daniel.imdb.orchestrator.search.UnifiedSearchService unified,
+      org.perez_f_daniel.imdb.orchestrator.search.FacetService facetService,
       FilterValidation validation, SearchProperties props, MongoTemplate mongo,
       @Qualifier("imdbLoaderExecutor") Executor executor) {
     this.titles = titles;
     this.names = names;
     this.unified = unified;
+    this.facetService = facetService;
     this.validation = validation;
     this.props = props;
     this.mongo = mongo;
@@ -170,6 +173,40 @@ public class SearchDataFetchers {
   public CompletableFuture<Boolean> nameCandidatesCapped(DgsDataFetchingEnvironment dfe) {
     NameSearchContext ctx = dfe.getSource();
     return CompletableFuture.supplyAsync(ctx.candidatesCapped::get, executor);
+  }
+
+  @DgsQuery
+  public CompletableFuture<Facets> facets() {
+    return CompletableFuture.supplyAsync(facetService::vocabulary, executor);
+  }
+
+  @DgsData(parentType = "TitleSearchResult", field = "facets")
+  public CompletableFuture<List<FacetBucket>> titleFacets(
+      @InputArgument List<TitleFacetDimension> dimensions,
+      @InputArgument Integer perDimension, DgsDataFetchingEnvironment dfe) {
+    TitleSearchContext ctx = dfe.getSource();
+    int per = clampPerDimension(perDimension);
+    List<TitleFacetDimension> dims = dimensions == null ? List.of() : dimensions;
+    return CompletableFuture.supplyAsync(
+        () -> dims.isEmpty() ? List.of() : facetService.titleFacets(ctx.filter, dims, per),
+        executor);
+  }
+
+  @DgsData(parentType = "NameSearchResult", field = "facets")
+  public CompletableFuture<List<FacetBucket>> nameFacets(
+      @InputArgument List<NameFacetDimension> dimensions,
+      @InputArgument Integer perDimension, DgsDataFetchingEnvironment dfe) {
+    NameSearchContext ctx = dfe.getSource();
+    int per = clampPerDimension(perDimension);
+    List<NameFacetDimension> dims = dimensions == null ? List.of() : dimensions;
+    return CompletableFuture.supplyAsync(
+        () -> dims.isEmpty() ? List.of()
+            : facetService.nameFacets(ctx.filter, names.resolvedInTitles(ctx.filter), dims, per),
+        executor);
+  }
+
+  private static int clampPerDimension(Integer perDimension) {
+    return perDimension == null ? 20 : Math.min(Math.max(perDimension, 1), 50);
   }
 
   /** Thread-safe single-computation memo so total + totalIsCapped share one count query. */

@@ -39,11 +39,56 @@ type Query {
 
     "Freshness/size of the derived search collections (last successful rebuild)."
     searchInfo: SearchInfo!
+
+    """
+    Vocabulary facets with global counts, materialized at rebuild time — the
+    source for dropdowns and checkbox groups. Values are sorted by count desc.
+    """
+    facets: Facets!
 }
 
 enum SearchKind { TITLE NAME }
 
 union SearchHit = Title | Name
+
+type Facets {
+    genres: [FacetValue!]!
+    titleTypes: [FacetValue!]!
+    "Credit categories from title_principals (actor, actress, director, ...)."
+    principalCategories: [FacetValue!]!
+    professions: [FacetValue!]!
+    akaRegions: [FacetValue!]!
+    akaLanguages: [FacetValue!]!
+}
+
+type FacetValue {
+    value: String!
+    count: Int!
+}
+
+"Per-dimension value counts within a search's current filter."
+type FacetBucket {
+    "The requested dimension's enum name."
+    dimension: String!
+    values: [FacetValue!]!
+}
+
+enum TitleFacetDimension {
+    GENRES
+    TITLE_TYPES
+    "Release decades, value = decade start year (e.g. \"1990\")."
+    DECADES
+    "averageRating buckets, value = band floor (e.g. \"8\" means 8.0-8.9)."
+    RATING_BANDS
+    "runtimeMinutes buckets: 0,30,60,90,120,150,180+; value = band floor."
+    RUNTIME_BANDS
+}
+
+enum NameFacetDimension {
+    PROFESSIONS
+    "Birth decades, value = decade start year."
+    BIRTH_DECADES
+}
 
 """
 All fields optional; absent = unconstrained. Genre/titleType/category values are
@@ -135,6 +180,11 @@ type TitleSearchResult {
     total: Int!
     totalIsCapped: Boolean!
     items: [Title!]!
+    """
+    Value counts within the current filter (for live checkbox counts). Computed
+    only if selected; evaluated over at most the same 10k candidate cap as total.
+    """
+    facets(dimensions: [TitleFacetDimension!]!, perDimension: Int! = 20): [FacetBucket!]!
 }
 
 type NameSearchResult {
@@ -143,6 +193,7 @@ type NameSearchResult {
     "True when the open-ended title scope was truncated to the most popular N matching titles. Computed only if selected."
     titleCandidatesCapped: Boolean!
     items: [Name!]!
+    facets(dimensions: [NameFacetDimension!]!, perDimension: Int! = 20): [FacetBucket!]!
 }
 
 type SearchInfo {

@@ -21,8 +21,8 @@ public final class OrchestratorFixtures {
 
   public static void seed(MongoTemplate mongo) {
     for (String c : List.of("title_basics", "title_ratings", "name_basics", "title_principals",
-        "search_titles", "search_names", "search_meta", "search_titles_next",
-        "search_names_next", "tmp_kft")) {
+        "title_akas", "search_titles", "search_names", "search_meta", "search_facets",
+        "search_titles_next", "search_names_next", "tmp_kft")) {
       mongo.dropCollection(c);
     }
 
@@ -83,6 +83,13 @@ public final class OrchestratorFixtures {
     insert(mongo, "title_principals",
         "{\"tconst\":\"%s\",\"ordering\":1,\"nconst\":\"nm0000004\",\"category\":\"actor\"}"
             .formatted(ADULT));
+
+    insert(mongo, "title_akas", """
+        {"titleId":"%s","ordering":1,"title":"Game of Thrones","types":"original",
+         "isOriginalTitle":1}""".formatted(GOT));
+    insert(mongo, "title_akas", """
+        {"titleId":"%s","ordering":2,"title":"Juego de tronos","region":"ES",
+         "language":"es","isOriginalTitle":0}""".formatted(GOT));
   }
 
   private static void insert(MongoTemplate mongo, String collection, String json) {
