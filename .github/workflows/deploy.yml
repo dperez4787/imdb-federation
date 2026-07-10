@@ -135,8 +135,14 @@ jobs:
           echo "Service URL: $URL"
 
           # IAM lockdown: anonymous calls must die at Google's front end.
-          CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$URL/graphql" \
-            -H 'Content-Type: application/json' -d '{"query":"{ _service { sdl } }"}')
+          # Binding changes from the deploy can take ~a minute to propagate.
+          for i in $(seq 1 18); do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$URL/graphql" \
+              -H 'Content-Type: application/json' -d '{"query":"{ _service { sdl } }"}')
+            [ "$CODE" = "403" ] && break
+            echo "anonymous returned $CODE, waiting for IAM propagation ($i/18)"
+            sleep 5
+          done
           [ "$CODE" = "403" ] || { echo "expected 403 without token, got $CODE"; exit 1; }
 
           TOKEN=$(gcloud auth print-identity-token \
