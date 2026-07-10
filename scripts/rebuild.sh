@@ -10,6 +10,10 @@ set -euo pipefail
 
 URL="${URL:-https://imdb-subgraph-orchestrator-dkuqnmldta-uc.a.run.app}"
 STEPS=(titles ratings names kft popularity indexes promote facets)
+# One session for the whole sequence: steps carrying this runId keep the rebuild
+# lock claimed BETWEEN requests, so a concurrent driver can't interleave. The
+# session auto-closes on the final facets step (or on failure / 2h staleness).
+RUN_ID="${RUN_ID:-$(uuidgen 2>/dev/null || echo "run-$(date +%s)-$$")}"
 
 id_token() {
   if [ -n "${IMPERSONATE_SA:-}" ]; then
@@ -19,11 +23,11 @@ id_token() {
   fi
 }
 
-echo "rebuilding search collections at $URL"
+echo "rebuilding search collections at $URL (runId $RUN_ID)"
 for step in "${STEPS[@]}"; do
   echo "== step: $step"
   # fresh token per step: earlier steps can outlive a token's 1h lifetime
-  curl -sf --max-time 3500 -X POST "$URL/admin/rebuild?steps=$step" \
+  curl -sf --max-time 3500 -X POST "$URL/admin/rebuild?steps=$step&runId=$RUN_ID" \
     -H "Authorization: Bearer $(id_token)" | sed 's/^/   /'
   echo
 done

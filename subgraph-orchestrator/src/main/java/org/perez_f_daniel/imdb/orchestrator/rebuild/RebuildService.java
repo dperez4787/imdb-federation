@@ -56,7 +56,19 @@ public class RebuildService {
 
   /** Runs the requested steps in declared order; returns per-step durations (ms). */
   public Map<String, Object> run(List<Step> steps) {
-    acquireLock();
+    return run(steps, null);
+  }
+
+  /**
+   * Step-driven rebuilds release the request lock between steps, so a bare lock
+   * would let a second driver interleave into an in-progress sequence and clobber
+   * the *_next staging collections. A runId claims a SESSION that persists across
+   * the driver's step requests: requests carrying a different (or no) runId get
+   * 409 until the session closes — on the terminal FACETS step, on failure, or
+   * after 2h of inactivity. Requests without a runId behave as one-shot runs.
+   */
+  public Map<String, Object> run(List<Step> steps, String runId) {
+    acquireLock(runId);
     Instant started = Instant.now();
     Map<String, Object> report = new LinkedHashMap<>();
     try {
@@ -69,16 +81,26 @@ public class RebuildService {
         report.put(step.name().toLowerCase(), Duration.between(t0, Instant.now()).toMillis());
         log.info("[rebuild] {} done in {}ms", step, report.get(step.name().toLowerCase()));
       }
+      boolean closesSession = runId == null || steps.contains(Step.FACETS);
       releaseLock(new Document("status", "IDLE")
           .append("finishedAt", Instant.now())
+          .append("lastActivityAt", Instant.now())
           .append("durationMs", Duration.between(started, Instant.now()).toMillis())
-          .append("error", null));
+          .append("error", null)
+          .append("runId", closesSession ? null : runId));
       report.put("status", "OK");
+      if (runId != null) {
+        report.put("runId", runId);
+        report.put("sessionOpen", !closesSession);
+      }
       return report;
     } catch (RuntimeException e) {
+      // failure closes the session so a fresh run can start immediately
       releaseLock(new Document("status", "FAILED")
           .append("finishedAt", Instant.now())
-          .append("error", String.valueOf(e.getMessage())));
+          .append("lastActivityAt", Instant.now())
+          .append("error", String.valueOf(e.getMessage()))
+          .append("runId", null));
       throw e;
     }
   }
@@ -231,18 +253,29 @@ public class RebuildService {
     return mongo.getDb().getCollection("search_meta");
   }
 
-  private void acquireLock() {
+  private void acquireLock(String runId) {
     Instant now = Instant.now();
-    Bson free = Filters.and(Filters.eq("_id", "rebuild"), Filters.or(
+    Instant stale = now.minus(STALE_LOCK);
+    Bson notRunning = Filters.or(
         Filters.ne("status", "RUNNING"),
-        Filters.lt("startedAt", now.minus(STALE_LOCK))));
+        Filters.lt("startedAt", stale));
+    // session guard: same run, no open session, or session gone stale
+    Bson sessionFree = Filters.or(
+        Filters.eq("runId", runId),
+        Filters.eq("runId", null),
+        Filters.lt("lastActivityAt", stale));
     try {
-      Document r = meta().findOneAndUpdate(free,
-          Updates.combine(Updates.set("status", "RUNNING"), Updates.set("startedAt", now)),
+      Document r = meta().findOneAndUpdate(
+          Filters.and(Filters.eq("_id", "rebuild"), notRunning, sessionFree),
+          Updates.combine(
+              Updates.set("status", "RUNNING"),
+              Updates.set("startedAt", now),
+              Updates.set("lastActivityAt", now),
+              Updates.set("runId", runId)),
           new FindOneAndUpdateOptions().upsert(true));
       // r may be null on first-ever upsert insert — that's a successful acquisition
     } catch (MongoWriteException | DuplicateKeyException e) {
-      // upsert raced/blocked by an existing RUNNING doc
+      // upsert raced/blocked by a RUNNING request or another run's open session
       throw new RebuildLockedException();
     } catch (com.mongodb.MongoCommandException e) {
       if (e.getErrorCode() == 11000) {
