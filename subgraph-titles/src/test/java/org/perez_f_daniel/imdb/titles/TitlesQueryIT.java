@@ -63,6 +63,14 @@ class TitlesQueryIT extends AbstractMongoIntegrationTest {
   }
 
   @Test
+  void imgUrlIsNullWithoutOmdbKey() {
+    // this context has no omdb.api-key -> the field degrades to null, never errors
+    Object url = dgs.executeAndExtractJsonPath(
+        "{ title(tconst: \"tt0944947\") { imgUrl } }", "data.title.imgUrl");
+    assertThat(url).isNull();
+  }
+
+  @Test
   void unknownTitleIsNull() {
     Object title = dgs.executeAndExtractJsonPath(
         "{ title(tconst: \"tt9999999\") { tconst } }", "data.title");
