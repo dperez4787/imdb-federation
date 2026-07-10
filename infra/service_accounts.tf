@@ -37,3 +37,13 @@ resource "google_service_account_iam_member" "deploy_wif" {
   role               = "roles/iam.workloadIdentityUser"
   member             = "principalSet://iam.googleapis.com/projects/${local.project_number}/locations/global/workloadIdentityPools/github-pool/attribute.repository/${local.github_repo}"
 }
+
+# The deploy workflow's smoke tests mint per-service ID tokens as itself
+# (gcloud --impersonate-service-account): self-impersonation via the IAM
+# credentials API needs an explicit tokenCreator grant — not implied by
+# WIF's workloadIdentityUser.
+resource "google_service_account_iam_member" "deploy_self_token_creator" {
+  service_account_id = google_service_account.deploy.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.deploy.email}"
+}

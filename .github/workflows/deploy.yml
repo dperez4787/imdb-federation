@@ -118,7 +118,7 @@ jobs:
             --project "${{ env.PROJECT_ID }}" \
             --service-account "${{ env.RUNTIME_SA }}" \
             --set-secrets "MONGODB_URI=IMDB_MONGODB_URI:latest" \
-            --allow-unauthenticated \
+            --no-allow-unauthenticated \
             --port 8080 \
             --min-instances 0 \
             --max-instances 5 \
@@ -133,11 +133,20 @@ jobs:
             --region "${{ env.REGION }}" --project "${{ env.PROJECT_ID }}" \
             --format 'value(status.url)')
           echo "Service URL: $URL"
+
+          # IAM lockdown: anonymous calls must die at Google's front end.
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$URL/graphql" \
+            -H 'Content-Type: application/json' -d '{"query":"{ _service { sdl } }"}')
+          [ "$CODE" = "403" ] || { echo "expected 403 without token, got $CODE"; exit 1; }
+
+          TOKEN=$(gcloud auth print-identity-token \
+            --impersonate-service-account "${{ secrets.DEPLOY_SA }}" --audiences "$URL")
           SDL=$(curl -sf -X POST "$URL/graphql" \
             -H 'Content-Type: application/json' \
+            -H "Authorization: Bearer $TOKEN" \
             -d '{"query":"{ _service { sdl } }"}')
           echo "$SDL" | grep -q '@key' || { echo "SDL missing @key"; exit 1; }
-          echo "Federated SDL OK"
+          echo "Federated SDL OK (403 anonymous, 200 with ID token)"
 
   # The router bakes the composed schema into its image, so it must recompose
   # and redeploy after every subgraph rollout. Fires only when all matrix legs
