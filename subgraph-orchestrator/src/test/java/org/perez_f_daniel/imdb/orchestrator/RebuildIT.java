@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -96,6 +97,44 @@ class RebuildIT extends AbstractMongoIntegrationTest {
         .append("status", "RUNNING").append("startedAt", Instant.now()));
     assertThatThrownBy(() -> rebuild.run(List.of(Step.values())))
         .isInstanceOf(RebuildService.RebuildLockedException.class);
+  }
+
+  @Test
+  void runSessionBlocksOtherDriversBetweenSteps() {
+    // driver A opens a session with a non-terminal step
+    Map<String, Object> first = rebuild.run(List.of(Step.TITLES), "run-A");
+    assertThat(first).containsEntry("sessionOpen", true);
+    assertThat(mongo.findById("rebuild", Document.class, "search_meta"))
+        .containsEntry("status", "IDLE").containsEntry("runId", "run-A");
+
+    // driver B (different runId) and a one-shot (no runId) are both rejected
+    assertThatThrownBy(() -> rebuild.run(List.of(Step.TITLES), "run-B"))
+        .isInstanceOf(RebuildService.RebuildLockedException.class);
+    assertThatThrownBy(() -> rebuild.run(List.of(Step.RATINGS)))
+        .isInstanceOf(RebuildService.RebuildLockedException.class);
+
+    // driver A continues, and the terminal FACETS step closes the session
+    rebuild.run(List.of(Step.RATINGS, Step.NAMES, Step.KFT, Step.POPULARITY,
+        Step.INDEXES, Step.PROMOTE), "run-A");
+    Map<String, Object> last = rebuild.run(List.of(Step.FACETS), "run-A");
+    assertThat(last).containsEntry("sessionOpen", false);
+    assertThat(mongo.findById("rebuild", Document.class, "search_meta").get("runId")).isNull();
+
+    // session closed: a different driver can acquire again
+    rebuild.run(List.of(Step.TITLES), "run-B");
+  }
+
+  @Test
+  void staleSessionIsClaimableByANewRun() {
+    // a session abandoned 3h ago (driver died mid-sequence) must not block forever
+    mongo.getCollection("search_meta").insertOne(new Document("_id", "rebuild")
+        .append("status", "IDLE").append("runId", "run-A")
+        .append("lastActivityAt",
+            java.util.Date.from(Instant.now().minus(java.time.Duration.ofHours(3)))));
+    Map<String, Object> r = rebuild.run(List.of(Step.TITLES), "run-C");
+    assertThat(r).containsEntry("status", "OK");
+    assertThat(mongo.findById("rebuild", Document.class, "search_meta"))
+        .containsEntry("runId", "run-C");
   }
 
   @Test
