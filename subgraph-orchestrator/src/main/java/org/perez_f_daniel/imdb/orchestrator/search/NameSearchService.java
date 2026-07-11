@@ -47,7 +47,9 @@ public class NameSearchService {
       return false;
     }
     Document first = mongo.getCollection("search_titles")
-        .aggregate(NamePipelines.titleScopeCount(filter, props)).allowDiskUse(true).first();
+        .aggregate(NamePipelines.titleScopeCount(filter, props)).allowDiskUse(true)
+        .maxTime(props.queryTimeoutMs(), java.util.concurrent.TimeUnit.MILLISECONDS)
+        .first();
     int n = first == null ? 0 : first.getInteger("n", 0);
     return n > props.titleCandidateCap();
   }
@@ -74,6 +76,10 @@ public class NameSearchService {
 
   private AggregateIterable<Document> run(NameSearchFilter filter, List<Document> pipeline) {
     String collection = NamePipelines.collectionFor(NamePipelines.strategyFor(filter));
-    return mongo.getCollection(collection).aggregate(pipeline).allowDiskUse(true);
+    AggregateIterable<Document> it = mongo.getCollection(collection).aggregate(pipeline)
+        .allowDiskUse(true)
+        .maxTime(props.queryTimeoutMs(), java.util.concurrent.TimeUnit.MILLISECONDS);
+    NamePipelines.hintFor(filter).ifPresent(it::hintString);
+    return it;
   }
 }

@@ -30,9 +30,11 @@ public class UnifiedSearchService {
       .thenComparing(Hit::id);
 
   private final MongoTemplate mongo;
+  private final SearchProperties props;
 
-  public UnifiedSearchService(MongoTemplate mongo) {
+  public UnifiedSearchService(MongoTemplate mongo, SearchProperties props) {
     this.mongo = mongo;
+    this.props = props;
   }
 
   public List<Object> search(String query, Set<SearchKind> kinds, int limit) {
@@ -63,7 +65,8 @@ public class UnifiedSearchService {
         new Document("$sort", new Document("score", -1).append("pop", -1).append("_id", 1)),
         new Document("$limit", limit),
         new Document("$project", new Document("score", 1).append("pop", 1)));
-    return mongo.getCollection(collection).aggregate(pipeline).allowDiskUse(true);
+    return mongo.getCollection(collection).aggregate(pipeline).allowDiskUse(true)
+        .maxTime(props.queryTimeoutMs(), java.util.concurrent.TimeUnit.MILLISECONDS);
   }
 
   private static double score(Document d) {

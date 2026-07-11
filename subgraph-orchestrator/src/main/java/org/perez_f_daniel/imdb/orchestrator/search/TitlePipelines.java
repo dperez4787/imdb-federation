@@ -27,6 +27,21 @@ public final class TitlePipelines {
     return f.hasPeople() ? Strategy.PEOPLE_FIRST : Strategy.PLAIN;
   }
 
+  /**
+   * Prefix-led queries must be pinned to the prefix index: left to itself the
+   * planner may walk a popularity index testing the regex as a residual over
+   * millions of entries (observed: 7s for a common prefix).
+   */
+  public static java.util.Optional<String> hintFor(TitleSearchFilter f) {
+    return strategyFor(f) == Strategy.PLAIN && hasPrefix(f) && !f.hasText()
+        ? java.util.Optional.of("title_prefix")
+        : java.util.Optional.empty();
+  }
+
+  private static boolean hasPrefix(TitleSearchFilter f) {
+    return f.titlePrefix() != null && !f.titlePrefix().isBlank();
+  }
+
   /** Collection the items/count pipelines run against for the given strategy. */
   public static String collectionFor(Strategy s) {
     return s == Strategy.PEOPLE_FIRST ? "title_principals" : "search_titles";
@@ -56,13 +71,28 @@ public final class TitlePipelines {
   public static List<Document> baseStages(
       TitleSearchFilter f, List<String> allTitleTypes, SearchProperties props) {
     return switch (strategyFor(f)) {
-      case PLAIN -> plainBase(f, allTitleTypes);
+      case PLAIN -> plainBase(f, allTitleTypes, props);
       case PEOPLE_FIRST -> peopleFirstBase(f, allTitleTypes);
       case TEXT_FIRST -> textFirstBase(f, allTitleTypes, props);
     };
   }
 
-  private static List<Document> plainBase(TitleSearchFilter f, List<String> allTitleTypes) {
+  private static List<Document> plainBase(
+      TitleSearchFilter f, List<String> allTitleTypes, SearchProperties props) {
+    if (hasPrefix(f) && !f.hasText()) {
+      // prefix-led: match ONLY the prefix first (hinted to title_prefix), take a
+      // deterministic alphabetical candidate slice, then apply remaining filters.
+      // Bounds the popularity top-k sort for hot short prefixes ("the...").
+      List<Document> p = new ArrayList<>();
+      p.add(new Document("$match", new Document("primaryTitleLower",
+          new Document("$regex", Regexes.prefix(f.titlePrefix())))));
+      p.add(new Document("$limit", props.prefixCandidateCap()));
+      Document rest = titleMatch(f, allTitleTypes, false, false);
+      if (!rest.isEmpty()) {
+        p.add(new Document("$match", rest));
+      }
+      return p;
+    }
     List<Document> p = new ArrayList<>();
     p.add(new Document("$match", titleMatch(f, allTitleTypes, true)));
     if (f.hasText()) {
@@ -126,13 +156,18 @@ public final class TitlePipelines {
     return p;
   }
 
-  /** Filter over search_titles fields; text/prefix included only when requested. */
   static Document titleMatch(TitleSearchFilter f, List<String> allTitleTypes, boolean includeText) {
+    return titleMatch(f, allTitleTypes, includeText, true);
+  }
+
+  /** Filter over search_titles fields; text/prefix included only when requested. */
+  static Document titleMatch(TitleSearchFilter f, List<String> allTitleTypes,
+      boolean includeText, boolean includePrefix) {
     Document m = new Document();
     if (includeText && f.hasText()) {
       m.append("$text", new Document("$search", f.query()));
     }
-    if (f.titlePrefix() != null && !f.titlePrefix().isBlank()) {
+    if (includePrefix && hasPrefix(f)) {
       m.append("primaryTitleLower", new Document("$regex", Regexes.prefix(f.titlePrefix())));
     }
     List<String> types = (f.titleTypes() != null && !f.titleTypes().isEmpty())

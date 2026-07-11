@@ -18,7 +18,7 @@ public class FilterValidation {
   public void validate(TitleSearchFilter f, TitleSort sort, Integer limit, Integer offset) {
     paging(offset);
     exclusive(f.query(), f.titlePrefix(), "query", "titlePrefix");
-    prefixLength(f.titlePrefix(), "titlePrefix");
+    prefixLength(f.titlePrefix(), "titlePrefix", props.minPrefixLength());
     cap(f.withPeople(), props.withPeopleMax(), "withPeople");
     cap(f.genresAny(), 10, "genresAny");
     cap(f.genresAll(), 5, "genresAll");
@@ -30,7 +30,7 @@ public class FilterValidation {
   public void validate(NameSearchFilter f, NameSort sort, Integer limit, Integer offset) {
     paging(offset);
     exclusive(f.query(), f.namePrefix(), "query", "namePrefix");
-    prefixLength(f.namePrefix(), "namePrefix");
+    prefixLength(f.namePrefix(), "namePrefix", props.minPrefixLength());
     cap(f.inTitles(), props.inTitlesMax(), "inTitles");
     cap(f.inGenres(), 10, "inGenres");
     range(f.bornFrom(), f.bornTo(), "born");
@@ -57,9 +57,9 @@ public class FilterValidation {
     }
   }
 
-  private static void prefixLength(String prefix, String field) {
-    if (prefix != null && prefix.strip().length() < 2) {
-      throw new DgsBadRequestException(field + " must be at least 2 characters");
+  private static void prefixLength(String prefix, String field, int min) {
+    if (prefix != null && prefix.strip().length() < min) {
+      throw new DgsBadRequestException(field + " must be at least " + min + " characters");
     }
   }
 

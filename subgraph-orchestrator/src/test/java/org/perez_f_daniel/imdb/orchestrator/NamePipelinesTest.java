@@ -15,7 +15,7 @@ import org.perez_f_daniel.imdb.orchestrator.search.SearchProperties;
 class NamePipelinesTest {
 
   private static final SearchProperties PROPS =
-      new SearchProperties(null, null, null, null, null, null, null, null);
+      new SearchProperties(null, null, null, null, null, null, null, null, null, null, null);
   private static final PageArgs PAGE = new PageArgs(25, 0);
 
   private static NameSearchFilter inTitles(List<String> t) {
@@ -89,6 +89,25 @@ class NamePipelinesTest {
         .isEqualTo("dicaprio");
     assertThat(p).noneMatch(d -> d.containsKey("$match")
         && d.get("$match", Document.class).containsKey("$text"));
+  }
+
+  @Test
+  void unscopedPrefixSplitsIntoHintedCappedStages() {
+    NameSearchFilter f = new NameSearchFilter(null, "dani", List.of("actor"), null, null,
+        null, null, null, null, null);
+    assertThat(NamePipelines.hintFor(f)).contains("name_prefix");
+    List<Document> p = NamePipelines.items(f, NameSort.POPULARITY_DESC, PAGE, List.of(), PROPS);
+    assertThat(p.get(0).get("$match", Document.class).keySet()).containsExactly("primaryNameLower");
+    assertThat(p.get(1).getInteger("$limit")).isEqualTo(25000);
+    assertThat(p.get(2).get("$match", Document.class)).doesNotContainKey("primaryNameLower");
+    assertThat(p.get(2).get("$match", Document.class)).containsKey("professions");
+  }
+
+  @Test
+  void scopedSearchesGetNoPrefixHint() {
+    NameSearchFilter scoped = new NameSearchFilter(null, "dani", null, null, null,
+        List.of("tt1"), null, null, null, null);
+    assertThat(NamePipelines.hintFor(scoped)).isEmpty();
   }
 
   @Test
