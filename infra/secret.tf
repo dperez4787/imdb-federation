@@ -9,3 +9,22 @@ resource "google_secret_manager_secret_iam_member" "runtime_reads_uri" {
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.runtime.email}"
 }
+
+# OMDb API key for Title.imgUrl (subgraph-titles). Owned by this stack; the
+# VALUE is added out-of-band (never in Terraform state):
+#   printf '<key>' | gcloud secrets versions add OMDB_API_KEY --data-file=-
+resource "google_secret_manager_secret" "omdb_api_key" {
+  secret_id = "OMDB_API_KEY"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_iam_member" "runtime_reads_omdb" {
+  secret_id = google_secret_manager_secret.omdb_api_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.runtime.email}"
+}

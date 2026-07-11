@@ -11,6 +11,9 @@ dgs:
     federation:
       enabled: true
 
+omdb:
+  api-key: ${OMDB_API_KEY:}
+
 server:
   port: ${PORT:8080}
 

@@ -17,4 +17,6 @@ type Title @key(fields: "tconst") {
     endYear: Int
     runtimeMinutes: Int
     genres: [String!]
+    "Poster image URL (OMDb). Null when the service has no OMDb key configured."
+    imgUrl: String
 }

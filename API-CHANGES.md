@@ -6,6 +6,21 @@ anonymous → 401). Existing entity fields are unchanged — search results are 
 stubs the router transparently hydrates, so any field documented for those entities can be
 selected directly on search results.
 
+## New entity field: `Title.imgUrl: String`
+
+OMDb poster URL with the API key attached **server-side** (key lives in Secret Manager,
+served only through the authenticated router — no more key in client bundles). Nullable:
+environments without the key configured return null, never an error. Hydrates onto search
+results and stubs like any other Title field:
+
+```graphql
+{ search(query: "godfather", limit: 3) { ... on Title { primaryTitle imgUrl } } }
+```
+
+Scope note for UI: the returned URL embeds the key and the browser fetches
+`img.omdbapi.com` directly — this is access-gating and rotation hygiene, not absolute
+secrecy. Select `imgUrl` instead of constructing OMDb URLs client-side.
+
 ## New root queries
 
 ### `searchTitles(filter, sort, limit, offset): TitleSearchResult!`
