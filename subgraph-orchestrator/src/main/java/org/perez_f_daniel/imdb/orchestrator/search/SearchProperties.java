@@ -7,21 +7,27 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record SearchProperties(
     Integer titleCandidateCap,
     Integer textCandidateCap,
+    Integer prefixCandidateCap,
     Integer countCap,
     Integer maxLimit,
     Integer defaultLimit,
     Integer maxOffset,
     Integer withPeopleMax,
-    Integer inTitlesMax) {
+    Integer inTitlesMax,
+    Integer minPrefixLength,
+    Integer queryTimeoutMs) {
 
   public SearchProperties {
     titleCandidateCap = titleCandidateCap == null ? 5000 : titleCandidateCap;
     textCandidateCap = textCandidateCap == null ? 20000 : textCandidateCap;
+    prefixCandidateCap = prefixCandidateCap == null ? 25000 : prefixCandidateCap;
     countCap = countCap == null ? 10000 : countCap;
     maxLimit = maxLimit == null ? 100 : maxLimit;
     defaultLimit = defaultLimit == null ? 25 : defaultLimit;
     maxOffset = maxOffset == null ? 10000 : maxOffset;
     withPeopleMax = withPeopleMax == null ? 20 : withPeopleMax;
     inTitlesMax = inTitlesMax == null ? 100 : inTitlesMax;
+    minPrefixLength = minPrefixLength == null ? 3 : minPrefixLength;
+    queryTimeoutMs = queryTimeoutMs == null ? 15000 : queryTimeoutMs;
   }
 }

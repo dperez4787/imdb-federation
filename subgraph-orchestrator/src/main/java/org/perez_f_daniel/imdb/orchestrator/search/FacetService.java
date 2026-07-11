@@ -78,7 +78,9 @@ public class FacetService {
 
   private List<FacetBucket> runFacets(String collection, List<Document> pipeline, List<String> dims) {
     Document result = mongo.getCollection(collection)
-        .aggregate(pipeline).allowDiskUse(true).first();
+        .aggregate(pipeline).allowDiskUse(true)
+        .maxTime(props.queryTimeoutMs(), java.util.concurrent.TimeUnit.MILLISECONDS)
+        .first();
     List<FacetBucket> buckets = new ArrayList<>(dims.size());
     for (String dim : dims) {
       List<Document> values = result == null ? List.of() : result.getList(dim, Document.class);

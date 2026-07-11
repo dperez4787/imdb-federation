@@ -98,7 +98,7 @@ data-driven strings (genres 'Sci-Fi'; titleTypes 'movie', 'tvSeries'; categories
 input TitleSearchFilter {
     "Full-text search on primaryTitle (word/stem match, not substring)."
     query: String
-    "Case-insensitive anchored prefix on primaryTitle (autocomplete). Min 2 chars. Mutually exclusive with query."
+    "Case-insensitive anchored prefix on primaryTitle (autocomplete). Min 3 chars. Mutually exclusive with query. Evaluated against a deterministic alphabetical cap of prefix matches - narrow prefixes are exact."
     titlePrefix: String
     titleTypes: [String!]
     "Title has at least one of these genres. Max 10."
@@ -133,7 +133,7 @@ input NameSearchFilter {
     case-insensitive substring match over the joined candidate set.
     """
     query: String
-    "Case-insensitive anchored prefix on primaryName (autocomplete). Min 2 chars. Exclusive with query."
+    "Case-insensitive anchored prefix on primaryName (autocomplete). Min 3 chars. Exclusive with query. Same deterministic prefix-candidate cap as titlePrefix."
     namePrefix: String
     "primaryProfession contains at least one of these (e.g. 'actor', 'composer')."
     professions: [String!]

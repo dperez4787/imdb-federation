@@ -27,7 +27,7 @@ public class TitleSearchService {
   public List<Title> items(TitleSearchFilter filter, TitleSort sort, PageArgs page) {
     List<Document> pipeline = TitlePipelines.items(filter, sort, page, titleTypes.get(), props);
     List<Title> out = new ArrayList<>(page.limit());
-    for (Document d : run(TitlePipelines.collectionFor(TitlePipelines.strategyFor(filter)), pipeline)) {
+    for (Document d : run(filter, pipeline)) {
       out.add(new Title(d.getString("tconst")));
     }
     return out;
@@ -35,14 +35,18 @@ public class TitleSearchService {
 
   public CountResult count(TitleSearchFilter filter, TitleSort sort) {
     List<Document> pipeline = TitlePipelines.count(filter, sort, titleTypes.get(), props);
-    Document first = run(TitlePipelines.collectionFor(TitlePipelines.strategyFor(filter)), pipeline)
-        .first();
+    Document first = run(filter, pipeline).first();
     int n = first == null ? 0 : first.getInteger("n", 0);
     return CountResult.of(n, props.countCap());
   }
 
-  private com.mongodb.client.AggregateIterable<Document> run(String collection, List<Document> pipeline) {
+  private com.mongodb.client.AggregateIterable<Document> run(
+      TitleSearchFilter filter, List<Document> pipeline) {
+    String collection = TitlePipelines.collectionFor(TitlePipelines.strategyFor(filter));
     MongoCollection<Document> coll = mongo.getCollection(collection);
-    return coll.aggregate(pipeline).allowDiskUse(true);
+    var it = coll.aggregate(pipeline).allowDiskUse(true)
+        .maxTime(props.queryTimeoutMs(), java.util.concurrent.TimeUnit.MILLISECONDS);
+    TitlePipelines.hintFor(filter).ifPresent(it::hintString);
+    return it;
   }
 }

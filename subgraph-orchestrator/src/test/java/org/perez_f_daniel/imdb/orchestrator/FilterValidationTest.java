@@ -17,7 +17,7 @@ import org.perez_f_daniel.imdb.orchestrator.search.SearchProperties;
 class FilterValidationTest {
 
   private final FilterValidation validation = new FilterValidation(
-      new SearchProperties(null, null, null, null, null, null, null, null));
+      new SearchProperties(null, null, null, null, null, null, null, null, null, null, null));
 
   private static TitleSearchFilter titles(java.util.function.UnaryOperator<TitleFilterBuilder> fn) {
     return fn.apply(new TitleFilterBuilder()).build();
@@ -43,9 +43,15 @@ class FilterValidationTest {
 
   @Test
   void shortPrefixRejected() {
-    TitleSearchFilter f = titles(b -> b.titlePrefix("g"));
+    // min prefix length is 3 (perf: short prefixes match enormous ranges)
+    TitleSearchFilter f = titles(b -> b.titlePrefix("ga"));
     assertThatThrownBy(() -> validation.validate(f, TitleSort.RELEVANCE, null, null))
-        .isInstanceOf(DgsBadRequestException.class);
+        .isInstanceOf(DgsBadRequestException.class)
+        .hasMessageContaining("3 characters");
+    TitleSearchFilter ok = titles(b -> b.titlePrefix("gam"));
+    org.assertj.core.api.Assertions.assertThatCode(
+        () -> validation.validate(ok, TitleSort.RELEVANCE, null, null))
+        .doesNotThrowAnyException();
   }
 
   @Test

@@ -27,6 +27,17 @@ public final class NamePipelines {
     return f.hasInTitles() ? Strategy.PRINCIPALS_FIRST : Strategy.TITLES_FIRST;
   }
 
+  /** Same planner problem as titles: pin prefix-led unscoped queries to the prefix index. */
+  public static java.util.Optional<String> hintFor(NameSearchFilter f) {
+    return strategyFor(f) == Strategy.UNSCOPED && hasPrefix(f) && !f.hasText()
+        ? java.util.Optional.of("name_prefix")
+        : java.util.Optional.empty();
+  }
+
+  private static boolean hasPrefix(NameSearchFilter f) {
+    return f.namePrefix() != null && !f.namePrefix().isBlank();
+  }
+
   public static String collectionFor(Strategy s) {
     return switch (s) {
       case UNSCOPED -> "search_names";
@@ -69,7 +80,7 @@ public final class NamePipelines {
   public static List<Document> baseStages(NameSearchFilter f, List<String> resolvedInTitles,
       SearchProperties props) {
     return switch (strategyFor(f)) {
-      case UNSCOPED -> unscopedBase(f);
+      case UNSCOPED -> unscopedBase(f, props);
       case PRINCIPALS_FIRST -> {
         List<Document> p = principalsEntry(f, resolvedInTitles);
         p.addAll(joinTail(f));
@@ -83,13 +94,26 @@ public final class NamePipelines {
     };
   }
 
-  private static List<Document> unscopedBase(NameSearchFilter f) {
+  private static List<Document> unscopedBase(NameSearchFilter f, SearchProperties props) {
     List<Document> p = new ArrayList<>();
+    if (hasPrefix(f) && !f.hasText()) {
+      // prefix-led: hinted prefix match, deterministic alphabetical candidate
+      // slice, then remaining filters (see TitlePipelines.plainBase rationale)
+      p.add(new Document("$match", new Document("primaryNameLower",
+          new Document("$regex", Regexes.prefix(f.namePrefix())))));
+      p.add(new Document("$limit", props.prefixCandidateCap()));
+      Document rest = new Document();
+      appendNameFilters(rest, f, "", false);
+      if (!rest.isEmpty()) {
+        p.add(new Document("$match", rest));
+      }
+      return p;
+    }
     Document m = new Document();
     if (f.hasText()) {
       m.append("$text", new Document("$search", f.query()));
     }
-    appendNameFilters(m, f, "");
+    appendNameFilters(m, f, "", true);
     p.add(new Document("$match", m));
     if (f.hasText()) {
       p.add(new Document("$addFields", new Document("score", new Document("$meta", "textScore"))));
@@ -138,7 +162,7 @@ public final class NamePipelines {
         .append("localField", "_id").append("foreignField", "_id").append("as", "n")));
     p.add(new Document("$unwind", "$n"));
     Document m = new Document();
-    appendNameFilters(m, f, "n.");
+    appendNameFilters(m, f, "n.", true);
     if (f.hasText()) {
       // degraded text: substring over the small joined candidate set
       m.append("n.primaryNameLower", new Document("$regex", Regexes.substring(f.query())));
@@ -149,9 +173,9 @@ public final class NamePipelines {
     return p;
   }
 
-  /** Name-level filters shared by both shapes; prefix path (not the joined query degradation). */
-  private static void appendNameFilters(Document m, NameSearchFilter f, String pfx) {
-    if (f.namePrefix() != null && !f.namePrefix().isBlank()) {
+  /** Name-level filters shared by both shapes; prefix inclusion controlled by caller. */
+  private static void appendNameFilters(Document m, NameSearchFilter f, String pfx, boolean includePrefix) {
+    if (includePrefix && hasPrefix(f)) {
       m.append(pfx + "primaryNameLower", new Document("$regex", Regexes.prefix(f.namePrefix())));
     }
     if (f.professions() != null && !f.professions().isEmpty()) {

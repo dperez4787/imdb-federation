@@ -48,7 +48,7 @@ everything (use sort + paging) — that IS the "top titles" query.
 | Field | Semantics | Cap |
 |---|---|---|
 | `query: String` | Full-text (word/stem) match on primaryTitle. Not substring. | — |
-| `titlePrefix: String` | Case-insensitive anchored prefix — use for autocomplete. Min 2 chars. Mutually exclusive with `query`. | — |
+| `titlePrefix: String` | Case-insensitive anchored prefix — use for autocomplete. **Min 3 chars.** Mutually exclusive with `query`. Evaluated against a deterministic alphabetical cap of prefix matches (25k) — narrow prefixes exact; hot short ones ("the…") sampled. | — |
 | `titleTypes: [String!]` | e.g. `movie`, `tvSeries`, `short` | — |
 | `genresAny: [String!]` | at least one genre matches | 10 |
 | `genresAll: [String!]` | every genre present (combinable with genresAny) | 5 |
@@ -86,7 +86,7 @@ People search. Title-scoped dimensions join through credits at query time.
 | Field | Semantics | Cap |
 |---|---|---|
 | `query: String` | Text match on primaryName. With a title-scoped dimension it degrades to case-insensitive substring over the joined candidates. Exclusive with `namePrefix`. | — |
-| `namePrefix: String` | anchored prefix, autocomplete. Min 2 chars. | — |
+| `namePrefix: String` | anchored prefix, autocomplete. **Min 3 chars.** Same prefix-candidate cap as titlePrefix. | — |
 | `professions: [String!]` | e.g. `actor`, `composer` | — |
 | `bornFrom/To: Int` | birth-year window | — |
 | `inTitles: [ID!]` | credited on at least one of these tconsts | 100 |
@@ -171,6 +171,18 @@ not update it automatically).
   rebuilds.
 - Validation failures (caps, exclusive fields, inverted ranges, unscoped
   CREDITS_DESC/categories) return GraphQL errors, not empty results.
+- Every search query carries a server-side execution ceiling (~15 s); pathological
+  queries fail fast instead of camping on the database.
+
+## UI performance guidance (measured 2026-07-11)
+
+- **While typing**: send ONLY `titlePrefix`/`namePrefix` queries, debounced — never the
+  `$text`-backed `search`/`query` per keystroke. Common single tokens ("Daniel") cost
+  seconds through the text index; prefixes are index-hinted + capped.
+- **On submit (Enter)**: use `search`/`query` for word/stem semantics.
+- Fetch `searchInfo` and `facets` once on load, not per keystroke.
+- Avoid combining several search root fields in one operation per keystroke — they run
+  concurrently but contend for the same database.
 
 ## Facet values for UI controls
 
