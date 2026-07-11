@@ -32,18 +32,23 @@ public class RebuildController {
 
   @PostMapping("/admin/rebuild")
   public ResponseEntity<Map<String, Object>> rebuild(
-      @RequestParam(name = "steps", required = false) String steps) {
+      @RequestParam(name = "steps", required = false) String steps,
+      @RequestParam(name = "runId", required = false) String runId) {
     List<Step> requested = steps == null || steps.isBlank()
         ? List.of(Step.values())
         : Arrays.stream(steps.split(","))
             .map(s -> Step.valueOf(s.strip().toUpperCase()))
             .toList();
     try {
-      return ResponseEntity.ok(rebuild.run(requested));
+      return ResponseEntity.ok(rebuild.run(requested, normalize(runId)));
     } catch (RebuildService.RebuildLockedException e) {
       return ResponseEntity.status(HttpStatus.CONFLICT)
-          .body(Map.of("status", "RUNNING", "error", e.getMessage()));
+          .body(Map.of("status", "LOCKED", "error", e.getMessage()));
     }
+  }
+
+  private static String normalize(String runId) {
+    return runId == null || runId.isBlank() ? null : runId.strip();
   }
 
   @GetMapping("/admin/rebuild/status")

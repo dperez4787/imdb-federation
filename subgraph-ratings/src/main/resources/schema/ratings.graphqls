@@ -1,5 +1,8 @@
 extend schema @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key"])
 
+"Marks a field as governed: the policy service decides who may read it, the router enforces. Registered at startup by imdb-common's GovernedFieldsRegistrar."
+directive @governed(reason: String) on FIELD_DEFINITION
+
 type Title @key(fields: "tconst") {
     tconst: ID!
     "Null when the title has no ratings row."
@@ -8,5 +11,5 @@ type Title @key(fields: "tconst") {
 
 type Rating {
     averageRating: Float!
-    numVotes: Int!
+    numVotes: Int! @governed(reason: "vote counts are analyst-only")
 }

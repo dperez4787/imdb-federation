@@ -119,6 +119,7 @@ jobs:
             --project "${{ env.PROJECT_ID }}" \
             --service-account "${{ env.RUNTIME_SA }}" \
             --set-secrets "MONGODB_URI=IMDB_MONGODB_URI:latest,OMDB_API_KEY=OMDB_API_KEY:latest" \
+            --set-env-vars "POLICY_SERVICE_URL=https://imdb-policy-service-dkuqnmldta-uc.a.run.app" \
             --no-allow-unauthenticated \
             --port 8080 \
             --timeout 3600 \
