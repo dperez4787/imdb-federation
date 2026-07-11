@@ -3,6 +3,8 @@ name: Deploy
 on:
   push:
     branches: [main]
+  # Manual full rollout: deploys ALL modules at HEAD (paths-filter is skipped).
+  workflow_dispatch:
 
 concurrency: deploy-main
 
@@ -21,6 +23,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: dorny/paths-filter@v3
+        if: github.event_name == 'push'
         id: filter
         with:
           filters: |
@@ -45,7 +48,7 @@ jobs:
           CHANGES: ${{ steps.filter.outputs.changes }}
         run: |
           ALL='["titles","names","ratings","episodes","crew","akas","principals","orchestrator"]'
-          if [ "$SHARED" = "true" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$SHARED" = "true" ]; then
             MODULES="$ALL"
           else
             MODULES=$(echo "$CHANGES" | jq -c '[.[] | select(. != "shared")]')
