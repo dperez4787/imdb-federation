@@ -112,7 +112,7 @@ class NamePipelinesTest {
   void unscopedPrefixSplitsIntoHintedCappedStages() {
     NameSearchFilter f = new NameSearchFilter(null, "dani", List.of("actor"), null, null,
         null, null, null, null, null);
-    assertThat(NamePipelines.hintFor(f)).contains("name_prefix");
+    assertThat(NamePipelines.hintFor(f)).contains("name_prefix_id");
     List<Document> p = NamePipelines.items(f, NameSort.POPULARITY_DESC, PAGE, List.of(), PROPS);
     assertThat(p.get(0).get("$match", Document.class).keySet()).containsExactly("primaryNameLower");
     assertThat(p.get(1).getInteger("$limit")).isEqualTo(25000);

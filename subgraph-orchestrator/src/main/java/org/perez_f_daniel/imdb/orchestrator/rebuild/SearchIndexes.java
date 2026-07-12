@@ -21,6 +21,10 @@ import org.bson.Document;
  * year_id, popularity_id) give the planner a streaming option when the
  * remaining filters are unselective residuals (e.g. genre browse), while the
  * prefixed families win for selective equality filters.
+ *
+ * title_prefix and name_prefix_id are hint targets — TitlePipelines.hintFor /
+ * NamePipelines.hintFor pin prefix queries to them BY NAME, and a rename here
+ * without updating the hints breaks every prefix query at runtime.
  */
 public final class SearchIndexes {
 

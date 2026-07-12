@@ -30,7 +30,7 @@ public final class NamePipelines {
   /** Same planner problem as titles: pin prefix-led unscoped queries to the prefix index. */
   public static java.util.Optional<String> hintFor(NameSearchFilter f) {
     return strategyFor(f) == Strategy.UNSCOPED && hasPrefix(f) && !f.hasText()
-        ? java.util.Optional.of("name_prefix")
+        ? java.util.Optional.of("name_prefix_id")
         : java.util.Optional.empty();
   }
 
