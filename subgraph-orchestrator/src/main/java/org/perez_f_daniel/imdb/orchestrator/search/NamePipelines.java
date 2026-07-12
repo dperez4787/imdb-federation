@@ -194,6 +194,13 @@ public final class NamePipelines {
     return m;
   }
 
+  /**
+   * Tiebreak direction pairs with the SearchIndexes families (see the note in
+   * TitlePipelines.sortSpec): born_id is declared ascending, so BIRTH_YEAR_DESC
+   * is the reverse-traversal case (_id:-1); popularity_id and name_prefix_id run
+   * forward for their sorts. Scoped sorts run in-memory after the join, where
+   * the direction only affects determinism, not index use.
+   */
   static Document sortSpec(NameSearchFilter f, NameSort sort, Strategy strategy) {
     boolean scoped = strategy != Strategy.UNSCOPED;
     NameSort effective = sort;
@@ -204,14 +211,13 @@ public final class NamePipelines {
       effective = scoped ? NameSort.CREDITS_DESC : NameSort.POPULARITY_DESC;
     }
     String namePath = scoped ? "n." : "";
-    Document s = switch (effective) {
-      case POPULARITY_DESC -> new Document(namePath + "popularity", -1);
-      case CREDITS_DESC -> new Document("credits", -1);
-      case NAME_ASC -> new Document(namePath + "primaryNameLower", 1);
-      case BIRTH_YEAR_ASC -> new Document(namePath + "birthYear", 1);
-      case BIRTH_YEAR_DESC -> new Document(namePath + "birthYear", -1);
+    return switch (effective) {
+      case POPULARITY_DESC -> new Document(namePath + "popularity", -1).append("_id", 1);
+      case CREDITS_DESC -> new Document("credits", -1).append("_id", 1);
+      case NAME_ASC -> new Document(namePath + "primaryNameLower", 1).append("_id", 1);
+      case BIRTH_YEAR_ASC -> new Document(namePath + "birthYear", 1).append("_id", 1);
+      case BIRTH_YEAR_DESC -> new Document(namePath + "birthYear", -1).append("_id", -1);
       case RELEVANCE -> throw new IllegalStateException("resolved above");
     };
-    return s.append("_id", 1);
   }
 }

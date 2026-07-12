@@ -208,20 +208,27 @@ public final class TitlePipelines {
     }
   }
 
+  /**
+   * The _id tiebreak direction must pair with the SearchIndexes sort families:
+   * descending sorts run the index forward (_id:1), ascending ones stream the
+   * same index backwards, which negates every key ({startYear:-1,_id:1} read in
+   * reverse is {startYear:1,_id:-1}). Still deterministic either way.
+   */
   static Document sortSpec(TitleSearchFilter f, TitleSort sort, Strategy strategy) {
     TitleSort effective = sort;
     if (sort == TitleSort.RELEVANCE) {
       effective = f.hasText() ? null : TitleSort.POPULARITY_DESC;
     }
-    Document s = effective == null
-        ? new Document("score", -1) // materialized via $addFields after $text
-        : switch (effective) {
-          case POPULARITY_DESC -> new Document("numVotes", -1);
-          case RATING_DESC -> new Document("averageRating", -1);
-          case YEAR_DESC -> new Document("startYear", -1);
-          case YEAR_ASC -> new Document("startYear", 1);
-          case RELEVANCE -> throw new IllegalStateException("resolved above");
-        };
-    return s.append("_id", 1);
+    if (effective == null) {
+      // score is materialized via $addFields after $text; in-memory sort
+      return new Document("score", -1).append("_id", 1);
+    }
+    return switch (effective) {
+      case POPULARITY_DESC -> new Document("numVotes", -1).append("_id", 1);
+      case RATING_DESC -> new Document("averageRating", -1).append("_id", 1);
+      case YEAR_DESC -> new Document("startYear", -1).append("_id", 1);
+      case YEAR_ASC -> new Document("startYear", 1).append("_id", -1);
+      case RELEVANCE -> throw new IllegalStateException("resolved above");
+    };
   }
 }

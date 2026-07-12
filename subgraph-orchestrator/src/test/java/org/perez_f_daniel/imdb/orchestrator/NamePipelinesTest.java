@@ -50,6 +50,23 @@ class NamePipelinesTest {
   }
 
   @Test
+  void birthYearDescFlipsTiebreakForReverseIndexTraversal() {
+    Document asc = NamePipelines.items(
+            NameSearchFilter.empty(), NameSort.BIRTH_YEAR_ASC, PAGE, List.of(), PROPS)
+        .stream().filter(d -> d.containsKey("$sort")).findFirst().orElseThrow()
+        .get("$sort", Document.class);
+    Document desc = NamePipelines.items(
+            NameSearchFilter.empty(), NameSort.BIRTH_YEAR_DESC, PAGE, List.of(), PROPS)
+        .stream().filter(d -> d.containsKey("$sort")).findFirst().orElseThrow()
+        .get("$sort", Document.class);
+    // born_id is declared ascending, so ASC runs forward and DESC negates every key
+    assertThat(asc).containsExactly(
+        java.util.Map.entry("birthYear", 1), java.util.Map.entry("_id", 1));
+    assertThat(desc).containsExactly(
+        java.util.Map.entry("birthYear", -1), java.util.Map.entry("_id", -1));
+  }
+
+  @Test
   void scopedRelevanceFallsBackToCredits() {
     List<Document> p = NamePipelines.items(
         inTitles(List.of("tt1")), NameSort.RELEVANCE, PAGE, List.of("tt1"), PROPS);

@@ -65,10 +65,10 @@ class RebuildIT extends AbstractMongoIntegrationTest {
     assertThat(noVotes).doesNotContainKeys("popularity", "birthYear", "professions");
 
     // index contract
-    assertThat(indexNames("search_titles")).contains("type_votes_year", "type_rating_votes",
-        "genres_type_votes_year", "title_prefix", "title_text");
-    assertThat(indexNames("search_names")).contains("professions_popularity", "popularity",
-        "name_prefix", "name_text", "born");
+    assertThat(indexNames("search_titles")).contains("type_votes_id", "type_rating_id",
+        "genres_type_votes_id", "votes_id", "rating_id", "year_id", "title_prefix", "title_text");
+    assertThat(indexNames("search_names")).contains("professions_popularity_id", "popularity_id",
+        "name_prefix_id", "name_text", "born_id");
 
     // meta + no leftovers
     Document meta = mongo.findById("rebuild", Document.class, "search_meta");

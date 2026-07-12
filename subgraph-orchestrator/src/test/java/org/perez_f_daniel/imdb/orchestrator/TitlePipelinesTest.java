@@ -72,6 +72,23 @@ class TitlePipelinesTest {
   }
 
   @Test
+  void ascendingSortFlipsTiebreakForReverseIndexTraversal() {
+    List<Document> desc = TitlePipelines.items(
+        TitleSearchFilter.empty(), TitleSort.YEAR_DESC, PAGE, ALL_TYPES, PROPS);
+    List<Document> asc = TitlePipelines.items(
+        TitleSearchFilter.empty(), TitleSort.YEAR_ASC, PAGE, ALL_TYPES, PROPS);
+    Document descSort = desc.stream().filter(d -> d.containsKey("$sort")).findFirst()
+        .orElseThrow().get("$sort", Document.class);
+    Document ascSort = asc.stream().filter(d -> d.containsKey("$sort")).findFirst()
+        .orElseThrow().get("$sort", Document.class);
+    // asc must be the exact reverse traversal of the year_id index: every key negated
+    assertThat(descSort).containsExactly(
+        java.util.Map.entry("startYear", -1), java.util.Map.entry("_id", 1));
+    assertThat(ascSort).containsExactly(
+        java.util.Map.entry("startYear", 1), java.util.Map.entry("_id", -1));
+  }
+
+  @Test
   void relevanceWithoutQueryFallsBackToPopularity() {
     List<Document> p = TitlePipelines.items(
         TitleSearchFilter.empty(), TitleSort.RELEVANCE, PAGE, ALL_TYPES, PROPS);
