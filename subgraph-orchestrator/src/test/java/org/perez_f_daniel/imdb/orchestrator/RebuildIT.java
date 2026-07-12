@@ -41,6 +41,8 @@ class RebuildIT extends AbstractMongoIntegrationTest {
     Document got = mongo.findById(OrchestratorFixtures.GOT, Document.class, "search_titles");
     assertThat(got.getString("titleType")).isEqualTo("tvSeries");
     assertThat(got.getString("primaryTitleLower")).isEqualTo("game of thrones");
+    assertThat(got.getList("titleTerms", String.class))
+        .containsExactly("game", "of", "thrones");
     assertThat(got.getList("genres", String.class))
         .containsExactly("Action", "Adventure", "Drama");
     assertThat(got.getBoolean("isAdult")).isFalse();
@@ -59,6 +61,8 @@ class RebuildIT extends AbstractMongoIntegrationTest {
     assertThat(cranston.get("popularity", Number.class).longValue()).isEqualTo(3900000L);
     assertThat(cranston.getList("professions", String.class))
         .containsExactly("actor", "producer");
+    assertThat(cranston.getList("nameTerms", String.class))
+        .containsExactly("bryan", "cranston");
     Document clarke = mongo.findById("nm0000001", Document.class, "search_names");
     assertThat(clarke.get("popularity", Number.class).longValue()).isEqualTo(2000000L);
     Document noVotes = mongo.findById("nm0000004", Document.class, "search_names");
@@ -66,9 +70,10 @@ class RebuildIT extends AbstractMongoIntegrationTest {
 
     // index contract
     assertThat(indexNames("search_titles")).contains("type_votes_id", "type_rating_id",
-        "genres_type_votes_id", "votes_id", "rating_id", "year_id", "title_prefix", "title_text");
+        "genres_type_votes_id", "votes_id", "rating_id", "year_id", "title_terms_id",
+        "title_prefix", "title_text");
     assertThat(indexNames("search_names")).contains("professions_popularity_id", "popularity_id",
-        "name_prefix_id", "name_text", "born_id");
+        "name_terms_id", "name_prefix_id", "name_text", "born_id");
 
     // meta + no leftovers
     Document meta = mongo.findById("rebuild", Document.class, "search_meta");

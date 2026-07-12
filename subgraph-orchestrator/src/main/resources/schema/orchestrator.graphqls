@@ -30,10 +30,12 @@ type Query {
     ): NameSearchResult!
 
     """
-    Unified search across titles and people — the global search box. Word/stem
-    matching on the submitted query (use titlePrefix/namePrefix autocomplete
-    while typing). Ranked by text relevance, popularity breaking ties. Max 50
-    results, no paging; adult titles excluded.
+    Unified search across titles and people — the global search box. Every word
+    of the query must match a word of the title/name; in multi-word queries the
+    last word may be partially typed (3+ chars prefix-match). Ranked by
+    popularity (title votes / people's knownFor votes). Use titlePrefix/
+    namePrefix autocomplete while typing. Max 50 results, no paging; adult
+    titles excluded.
     """
     search(query: String!, kinds: [SearchKind!], limit: Int): [SearchHit!]!
 

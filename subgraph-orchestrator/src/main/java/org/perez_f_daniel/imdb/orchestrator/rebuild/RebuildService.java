@@ -114,6 +114,7 @@ public class RebuildService {
               .append("titleType", 1)
               .append("primaryTitle", 1)
               .append("primaryTitleLower", new Document("$toLower", "$primaryTitle"))
+              .append("titleTerms", termsExpr("$primaryTitle"))
               .append("startYear", 1)
               .append("endYear", 1)
               .append("runtimeMinutes", 1)
@@ -136,6 +137,7 @@ public class RebuildService {
               .append("_id", "$nconst")
               .append("primaryName", 1)
               .append("primaryNameLower", new Document("$toLower", "$primaryName"))
+              .append("nameTerms", termsExpr("$primaryName"))
               .append("birthYear", 1)
               .append("deathYear", 1)
               .append("professions", splitOrRemove("$primaryProfession"))),
@@ -232,6 +234,20 @@ public class RebuildService {
         Filters.eq("_id", id),
         new Document("_id", id).append("values", values),
         new com.mongodb.client.model.ReplaceOptions().upsert(true));
+  }
+
+  /**
+   * Lowercased letter/digit token runs ("Kiss Me, Deadly!" -> ["kiss","me","deadly"])
+   * for the unified-search AND match. Must stay in lockstep with the query-side
+   * tokenizer (UnifiedSearchService.tokenize): $toLower lowercases ASCII only,
+   * and the token class is PCRE2 [\p{L}\p{N}]+.
+   */
+  private static Document termsExpr(String field) {
+    return new Document("$map", new Document()
+        .append("input", new Document("$regexFindAll", new Document()
+            .append("input", new Document("$toLower", field))
+            .append("regex", "[\\p{L}\\p{N}]+")))
+        .append("in", "$$this.match"));
   }
 
   /** {$split: [csv, ","]} when present, $$REMOVE when the source column was absent. */

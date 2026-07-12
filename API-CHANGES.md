@@ -101,11 +101,17 @@ scope), `NAME_ASC`, `BIRTH_YEAR_ASC/DESC`.
 
 ### `search(query: String!, kinds: [SearchKind!], limit: Int): [SearchHit!]!`
 
-The global search box: one call, titles and people merged and ranked (text relevance,
-popularity breaking ties). `union SearchHit = Title | Name` — branch on `__typename`.
-`kinds: [TITLE]`/`[NAME]` restricts; default both. `limit` 1–50 (default 10), no paging,
-no counts, adult titles excluded. Query min 2 chars; word/stem matching — use
-`titlePrefix`/`namePrefix` autocomplete while the user is still typing.
+The global search box: one call, titles and people merged and ranked by popularity
+(title votes / a person's knownFor votes). `union SearchHit = Title | Name` — branch on
+`__typename`. `kinds: [TITLE]`/`[NAME]` restricts; default both. `limit` 1–50 (default
+10), no paging, no counts, adult titles excluded. Query min 2 chars.
+
+Matching (since 2026-07-12): **every word of the query must match a word** of the
+title/name — case- and punctuation-insensitive, AND semantics ("jennifer aniston" no
+longer returns every Jennifer). In multi-word queries the last word may be partially
+typed: 3+ chars prefix-match ("game of thro" finds Game of Thrones). A single word
+matches exactly (no stemming, no prefix) — use `titlePrefix`/`namePrefix` autocomplete
+while the user is still typing. Misspellings now return empty instead of noise.
 
 ```graphql
 { search(query: "carmencita", limit: 10) {
@@ -176,10 +182,13 @@ not update it automatically).
 
 ## UI performance guidance (measured 2026-07-11)
 
-- **While typing**: send ONLY `titlePrefix`/`namePrefix` queries, debounced — never the
-  `$text`-backed `search`/`query` per keystroke. Common single tokens ("Daniel") cost
-  seconds through the text index; prefixes are index-hinted + capped.
-- **On submit (Enter)**: use `search`/`query` for word/stem semantics.
+- **While typing**: send ONLY `titlePrefix`/`namePrefix` queries, debounced. Prefixes
+  are index-hinted + capped.
+- **On submit (Enter)**: use `search` — since 2026-07-12 it is AND-of-words + popularity
+  ranked over materialized token indexes (sub-second even for "la"-type tokens that used
+  to hit the 15s execution ceiling). `searchTitles/searchNames filter.query` remain
+  `$text`-backed (word/stem, OR-scored): fine title-only/name-only at ~0.3s, slower for
+  common name tokens.
 - Fetch `searchInfo` and `facets` once on load, not per keystroke.
 - Avoid combining several search root fields in one operation per keystroke — they run
   concurrently but contend for the same database.

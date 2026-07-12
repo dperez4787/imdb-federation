@@ -25,6 +25,13 @@ import org.bson.Document;
  * title_prefix and name_prefix_id are hint targets — TitlePipelines.hintFor /
  * NamePipelines.hintFor pin prefix queries to them BY NAME, and a rename here
  * without updating the hints breaks every prefix query at runtime.
+ *
+ * title_terms_id and name_terms_id serve the unified search's AND-of-tokens
+ * match (UnifiedSearchService): a point bound on one term streams the
+ * popularity order and terminates at the result limit, with the remaining
+ * tokens as residual filters. Multikey, so no covered plans — every examined
+ * key costs a fetch, which is why the query side never issues a bare prefix
+ * range for a lone token.
  */
 public final class SearchIndexes {
 
@@ -43,6 +50,8 @@ public final class SearchIndexes {
       idx("votes_id", new Document("numVotes", -1).append("_id", 1)),
       idx("rating_id", new Document("averageRating", -1).append("_id", 1)),
       idx("year_id", new Document("startYear", -1).append("_id", 1)),
+      idx("title_terms_id",
+          new Document("titleTerms", 1).append("numVotes", -1).append("_id", 1)),
       idx("title_prefix", new Document("primaryTitleLower", 1)),
       idx("title_text", new Document("primaryTitle", "text")));
 
@@ -55,6 +64,8 @@ public final class SearchIndexes {
       // full (not partial): unfiltered BIRTH_YEAR_* sorts must stream the
       // missing-birthYear docs too, and a partial index can't serve them
       idx("born_id", new Document("birthYear", 1).append("_id", 1)),
+      idx("name_terms_id",
+          new Document("nameTerms", 1).append("popularity", -1).append("_id", 1)),
       idx("name_prefix_id", new Document("primaryNameLower", 1).append("_id", 1)),
       idx("name_text", new Document("primaryName", "text")));
 
