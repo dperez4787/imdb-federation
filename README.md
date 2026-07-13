@@ -5,6 +5,15 @@ subgraph per MongoDB collection plus a search orchestrator, composed by a
 [WunderGraph Cosmo](https://cosmo-docs.wundergraph.com/) router
 ([cosmo-router](https://github.com/dperez4787/cosmo-router)). Data is loaded into
 MongoDB Atlas by [imdb-data-pipeline](https://github.com/dperez4787/imdb-data-pipeline).
+## Live UIs
+
+Every user-facing surface in this system, live:
+
+| Surface | URL |
+|---|---|
+| **Marquee** — the IMDb browser | https://dfp-imdb-browser.web.app/titles |
+| **IMDb Graph Governance** — field-level policy control plane | https://imdb-policy-service-dkuqnmldta-uc.a.run.app/ |
+| **linear-example** — records app + the engineering blog | https://project-d60a83c1-2c60-4d51-ad0.web.app/ · [blog](https://project-d60a83c1-2c60-4d51-ad0.web.app/blog) |
 
 ## Architecture
 
